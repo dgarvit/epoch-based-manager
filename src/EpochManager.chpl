@@ -47,6 +47,21 @@ module EpochManager {
     proc unpin(tok: unmanaged _token) {
       tok.local_epoch.write(0);
     }
+
+    // Attempt to announce a new epoch
+    proc try_advance() : bool {
+      var epoch = global_epoch.read();
+      for tok in allocated_list {
+        var local_epoch = tok.local_epoch.read();
+        if (local_epoch > 0 && local_epoch != epoch) {
+          return false;
+        }
+      }
+
+      // Advance the global epoch
+      global_epoch.write((epoch + 1)%EBR_EPOCHS);
+      return true;
+    }
   }
 
   class _token {
