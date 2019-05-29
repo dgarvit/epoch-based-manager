@@ -7,18 +7,23 @@ module EpochManager {
     var allocated_list : LinkedList(unmanaged _token);
     var allocated_list_lock : atomic bool;
     var advance_lock : atomic bool;
-    var limbo_list: LinkedList(unmanaged _deletable);
+    //var limbo_list: LinkedList(unmanaged _deletable);
+    var limbo_list : unmanaged _deletable;
     var limbo_list_lock : atomic bool;
-    var epoch_list : [1..EBR_EPOCHS] LinkedList(unmanaged _deletable);
+    //var epoch_list : [1..EBR_EPOCHS] LinkedList(unmanaged _deletable);
+    var epoch_list : [1..EBR_EPOCHS] unmanaged _deletable;
     var id_counter : atomic uint;
 
     proc init() {
       allocated_list = new LinkedList(unmanaged _token);
-      limbo_list = new LinkedList(unmanaged _deletable);
+      //limbo_list = new LinkedList(unmanaged _deletable);
+      limbo_list = nil;
       this.complete();
       global_epoch.write(1);
+      /*for i in [1..EBR_EPOCHS] do
+        epoch_list[i] = nil;//new LinkedList(unmanaged _deletable);*/
       for i in [1..EBR_EPOCHS] do
-        epoch_list[i] = new LinkedList(unmanaged _deletable);
+        epoch_list[i] = nil;
     }
 
     proc register() : unmanaged _token { // Should be called only once
@@ -84,8 +89,56 @@ module EpochManager {
       while limbo_list_lock.testAndSet() {
         chpl_task_yield();
       }
-      limbo_list.append(deletable);
+      //limbo_list.append(deletable);
+      if (limbo_list == nil) {
+        limbo_list = deletable;
+      } else {
+        deletable.next = limbo_list;
+        limbo_list = deletable;
+      }
       limbo_list_lock.clear();
+    }
+
+    proc try_reclaim() {
+      var count = EBR_EPOCHS;
+
+      // if nothing to reclaim, try the next epoch, but loop only for one
+      // full cycle
+      while (count) {
+        count = count - 1;
+        if (!try_advance()) {
+          return;
+        }
+
+        var staging_epoch = global_epoch.read();
+        if (epoch_list[staging_epoch] != nil) {
+          writeln("Error: List not empty.");
+          //exit();
+        }
+
+        while limbo_list_lock.testAndSet() {
+          chpl_task_yield();
+        }
+        epoch_list[staging_epoch] = limbo_list;
+        limbo_list = nil;
+        limbo_list_lock.clear();
+
+        var gc_list = epoch_list[staging_epoch];
+        if (gc_list != nil) {
+          _reclaim(gc_list);
+          epoch_list[staging_epoch] = nil;
+          break;
+        }
+      }
+    }
+
+    proc _reclaim(inout gc_list : unmanaged _deletable) {
+      while (gc_list != nil) {
+        var x = gc_list;
+        gc_list = gc_list.next;
+        delete x.p;
+        delete x;
+      }
     }
   }
 
@@ -100,5 +153,11 @@ module EpochManager {
 
   class _deletable {
     var p: unmanaged object;
+    var next : unmanaged _deletable;
+
+    proc init(x : unmanaged object) {
+      p = x;
+      next = nil;
+    }
   }
 }
