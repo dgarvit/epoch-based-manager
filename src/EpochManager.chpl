@@ -6,6 +6,7 @@ module EpochManager {
     var global_epoch : atomic uint;
     var allocated_list : LinkedList(unmanaged _token);
     var allocated_list_lock : atomic bool;
+    var advance_lock : atomic bool;
     var limbo_list: unmanaged _deletable;
     var epoch_list : [1..EBR_EPOCHS] unmanaged _deletable;
     var id_counter : atomic uint;
@@ -51,16 +52,30 @@ module EpochManager {
     // Attempt to announce a new epoch
     proc try_advance() : bool {
       var epoch = global_epoch.read();
+      while advance_lock.testAndSet() {
+        chpl_task_yield();
+      }
       for tok in allocated_list {
         var local_epoch = tok.local_epoch.read();
         if (local_epoch > 0 && local_epoch != epoch) {
+          advance_lock.clear();
           return false;
         }
       }
 
       // Advance the global epoch
-      global_epoch.write((epoch + 1)%EBR_EPOCHS);
+      global_epoch.write((epoch % EBR_EPOCHS) + 1);
+      advance_lock.clear();
       return true;
+    }
+
+    // Return epoch which is safe to be reclaimed
+    proc gc_epoch() : uint {
+      var epoch = global_epoch.read() : int;
+      var ebr_epochs = EBR_EPOCHS : int;
+
+      // It is safe to reclaim from e-2 epoch
+      return ((ebr_epochs + (epoch-3) % ebr_epochs):uint % EBR_EPOCHS) + 1;
     }
   }
 
