@@ -37,6 +37,16 @@ module EpochManager {
       delete tok;
       allocated_list_lock.clear();
     }
+
+    proc pin(tok: unmanaged _token) {
+      // An inactive task has local_epoch set to 0. A value other than 0
+      // implies active task
+      tok.local_epoch.write(global_epoch.read());
+    }
+
+    proc unpin(tok: unmanaged _token) {
+      tok.local_epoch.write(0);
+    }
   }
 
   class _token {
