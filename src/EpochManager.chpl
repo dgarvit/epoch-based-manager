@@ -8,6 +8,7 @@ module EpochManager {
     var allocated_list_lock : atomic bool;
     var advance_lock : atomic bool;
     var limbo_list: LinkedList(unmanaged _deletable);
+    var limbo_list_lock : atomic bool;
     var epoch_list : [1..EBR_EPOCHS] LinkedList(unmanaged _deletable);
     var id_counter : atomic uint;
 
@@ -21,10 +22,10 @@ module EpochManager {
     }
 
     proc register() : unmanaged _token { // Should be called only once
+      var tok = new unmanaged _token(id_counter.fetchAdd(1));
       while allocated_list_lock.testAndSet() {
         chpl_task_yield(); // yield processor
       }
-      var tok = new unmanaged _token(id_counter.fetchAdd(1));
       allocated_list.append(tok);
       allocated_list_lock.clear();
       return tok;
@@ -51,10 +52,10 @@ module EpochManager {
 
     // Attempt to announce a new epoch
     proc try_advance() : bool {
-      var epoch = global_epoch.read();
       while advance_lock.testAndSet() {
         chpl_task_yield();
       }
+      var epoch = global_epoch.read();
       for tok in allocated_list {
         var local_epoch = tok.local_epoch.read();
         if (local_epoch > 0 && local_epoch != epoch) {
@@ -76,6 +77,15 @@ module EpochManager {
 
       // It is safe to reclaim from e-2 epoch
       return ((ebr_epochs + (epoch-3) % ebr_epochs):uint % EBR_EPOCHS) + 1;
+    }
+
+    proc delete_obj(x) {
+      var deletable = new unmanaged _deletable(x);
+      while limbo_list_lock.testAndSet() {
+        chpl_task_yield();
+      }
+      limbo_list.append(deletable);
+      limbo_list_lock.clear();
     }
   }
 
