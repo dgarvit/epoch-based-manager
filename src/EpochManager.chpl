@@ -7,17 +7,17 @@ module EpochManager {
     var allocated_list : LinkedList(unmanaged _token);
     var allocated_list_lock : atomic bool;
     var advance_lock : atomic bool;
-    var limbo_list: unmanaged _deletable;
-    var epoch_list : [1..EBR_EPOCHS] unmanaged _deletable;
+    var limbo_list: LinkedList(unmanaged _deletable);
+    var epoch_list : [1..EBR_EPOCHS] LinkedList(unmanaged _deletable);
     var id_counter : atomic uint;
 
     proc init() {
       allocated_list = new LinkedList(unmanaged _token);
-      limbo_list = nil;
+      limbo_list = new LinkedList(unmanaged _deletable);
       this.complete();
       global_epoch.write(1);
       for i in [1..EBR_EPOCHS] do
-        epoch_list[i] = nil;
+        epoch_list[i] = new LinkedList(unmanaged _deletable);
     }
 
     proc register() : unmanaged _token { // Should be called only once
@@ -90,7 +90,5 @@ module EpochManager {
 
   class _deletable {
     var p: unmanaged object;
-
-    var next : _deletable;
   }
 }
