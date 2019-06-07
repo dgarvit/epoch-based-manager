@@ -57,6 +57,10 @@ module LockFreeQueue {
         ptr = _head.read();
       }
     }
+
+    proc peek() : objType {
+      return _head.read().next.read();
+    }
   }
 
   class node {
