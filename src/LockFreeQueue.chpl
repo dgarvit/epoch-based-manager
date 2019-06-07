@@ -2,26 +2,43 @@ module LockFreeQueue {
 
   use LocalAtomics;
 
+  class node {
+    type eltType;
+    var val : eltType;
+    var next : LocalAtomicObject(unmanaged node(eltType));
+
+    proc init(val : ?eltType) {
+      this.eltType = eltType;
+      this.val = val;
+    }
+
+    proc init(type eltType) {
+      this.eltType = eltType;
+      val = nil;
+    }
+  }
+
   class LockFreeQueue {
     type objType;
-    var _head : LocalAtomicObject(objType);
-    var _tail : LocalAtomicObject(objType);
+    var _head : LocalAtomicObject(unmanaged node(objType));
+    var _tail : LocalAtomicObject(unmanaged node(objType));
 
     proc init(type objType) {
       this.objType = objType;
       this.complete();
-      var _node = new objType(0);
+      var _node = new unmanaged node(objType);
       _head.write(_node);
       _tail.write(_node);
     }
 
     proc enqueue(newObj : objType) {
+      var n = new unmanaged node(newObj);
       while (true) {
         var curr_tail = _tail.readABA();
         var next = curr_tail.next.readABA();
         if (next.getObject() == nil) {
-          if (curr_tail.next.compareExchangeABA(next, newObj)) {
-            _tail.compareExchangeABA(curr_tail, newObj);
+          if (curr_tail.next.compareExchangeABA(next, n)) {
+            _tail.compareExchangeABA(curr_tail, n);
             break;
           }
         }
@@ -43,7 +60,7 @@ module LockFreeQueue {
         }
         else {
           if (_head.compareExchangeABA(curr_head, next.getObject())) then
-            return next.getObject();
+            return next.getObject().val;
         }
       }
       return nil;
@@ -53,22 +70,14 @@ module LockFreeQueue {
       var ptr = _head.read();
       while (ptr != nil) {
         _head = ptr.next;
+        delete ptr.val;
         delete ptr;
         ptr = _head.read();
       }
     }
 
     proc peek() : objType {
-      return _head.read().next.read();
-    }
-  }
-
-  class node {
-    var val : int;
-    var next : LocalAtomicObject(unmanaged node);
-
-    proc init(val : int) {
-      this.val = val;
+      return _head.read().next.read().val;
     }
   }
 }
