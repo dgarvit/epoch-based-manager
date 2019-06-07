@@ -43,7 +43,7 @@ module LockFreeQueue {
         }
         else {
           if (_head.compareExchangeABA(curr_head, next.getObject())) then
-            return curr_head.getObject();
+            return next.getObject();
         }
       }
       return nil;
