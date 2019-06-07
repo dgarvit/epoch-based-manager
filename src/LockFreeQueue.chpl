@@ -30,6 +30,33 @@ module LockFreeQueue {
         }
       }
     }
+
+    proc dequeue() : objType {
+      while (true) {
+        var curr_head = _head.readABA();
+        var curr_tail = _tail.readABA();
+        var next = curr_head.next.readABA();
+        if (_head.read() == _tail.read()) {
+          if (next.getObject() == nil) then
+            return nil;
+          _tail.compareExchangeABA(curr_tail, next.getObject());
+        }
+        else {
+          if (_head.compareExchangeABA(curr_head, next.getObject())) then
+            return curr_head.getObject();
+        }
+      }
+      return nil;
+    }
+
+    proc deinit() {
+      var ptr = _head.read();
+      while (ptr != nil) {
+        _head = ptr.next;
+        delete ptr;
+        ptr = _head.read();
+      }
+    }
   }
 
   class node {
