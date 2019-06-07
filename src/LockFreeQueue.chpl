@@ -1,3 +1,6 @@
+/**
+ * Based on Michael Scott Queue.
+ */
 module LockFreeQueue {
 
   use LocalAtomics;
@@ -66,6 +69,18 @@ module LockFreeQueue {
       return nil;
     }
 
+    iter these() : objType {
+      var ptr = _head.read().next.read();
+      while (ptr != nil) {
+        yield ptr.val;
+        ptr = ptr.next.read();
+      }
+    }
+
+    proc peek() : objType {
+      return _head.read().next.read().val;
+    }
+
     proc deinit() {
       var ptr = _head.read();
       while (ptr != nil) {
@@ -74,10 +89,6 @@ module LockFreeQueue {
         delete ptr;
         ptr = _head.read();
       }
-    }
-
-    proc peek() : objType {
-      return _head.read().next.read().val;
     }
   }
 }
