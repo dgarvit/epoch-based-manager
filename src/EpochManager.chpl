@@ -27,15 +27,11 @@ module EpochManager {
       return tok;
     }
 
-/*    proc unregister(tok: unmanaged _token) {
-      while allocated_list_lock.testAndSet() {
-        chpl_task_yield();
-      }
-      allocated_list.remove(tok);
-      delete tok;
-      allocated_list_lock.clear();
+    proc unregister(tok: unmanaged _token) {
+      tok.local_epoch.write(0);
+      free_list.enqueue(tok);
     }
-
+/*
     proc pin(tok: unmanaged _token) {
       // An inactive task has local_epoch set to 0. A value other than 0
       // implies active task
@@ -153,8 +149,15 @@ module EpochManager {
   var a = new unmanaged EpochManager();
   coforall i in 1..10 {
     var tok = a.register();
+    if i%2 == 0 {
+      a.unregister(tok);
+    }
   }
   for i in a.allocated_list {
+    writeln(i);
+  }
+  writeln();
+  for i in a.free_list {
     writeln(i);
   }
 }
