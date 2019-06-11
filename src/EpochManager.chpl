@@ -22,8 +22,11 @@ module EpochManager {
     }
 
     proc register() : unmanaged _token { // Should be called only once
-      var tok = new unmanaged _token(id_counter.fetchAdd(1));
-      allocated_list.append(tok);
+      var tok = free_list.dequeue();
+      if (tok == nil) {
+        tok = new unmanaged _token(id_counter.fetchAdd(1));
+        allocated_list.append(tok);
+      }
       return tok;
     }
 
@@ -149,15 +152,25 @@ module EpochManager {
   var a = new unmanaged EpochManager();
   coforall i in 1..10 {
     var tok = a.register();
-    if i%2 == 0 {
-      a.unregister(tok);
-    }
+    a.unregister(tok);
   }
   for i in a.allocated_list {
-    writeln(i);
+    writeln("Allocated List : " + i:string);
   }
   writeln();
   for i in a.free_list {
-    writeln(i);
+    writeln("Free list : " + i:string);
+  }
+
+
+  coforall i in 11..15 {
+    var tok = a.register();
+  }
+  for i in a.allocated_list {
+    writeln("Allocated List 2 : " + i:string);
+  }
+  writeln();
+  for i in a.free_list {
+    writeln("Free List 2 : " + i:string);
   }
 }
