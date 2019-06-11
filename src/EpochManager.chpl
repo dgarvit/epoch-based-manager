@@ -1,42 +1,33 @@
 /* Documentation for EpochManager */
 module EpochManager {
 
+  use LockFreeLinkedList;
+  use LockFreeQueue;
+
   class EpochManager {
     const EBR_EPOCHS : uint = 3;
     var global_epoch : atomic uint;
-    var allocated_list : LinkedList(unmanaged _token);
-    var allocated_list_lock : atomic bool;
-    var advance_lock : atomic bool;
-    //var limbo_list: LinkedList(unmanaged _deletable);
-    var limbo_list : unmanaged _deletable;
-    var limbo_list_lock : atomic bool;
-    //var epoch_list : [1..EBR_EPOCHS] LinkedList(unmanaged _deletable);
-    var epoch_list : [1..EBR_EPOCHS] unmanaged _deletable;
+    var allocated_list : unmanaged LockFreeLinkedList(unmanaged _token);
+    var free_list : unmanaged LockFreeQueue(unmanaged _token);
+    var limbo_list : [1..EBR_EPOCHS] unmanaged LockFreeQueue(unmanaged _deletable);
     var id_counter : atomic uint;
 
     proc init() {
-      allocated_list = new LinkedList(unmanaged _token);
-      //limbo_list = new LinkedList(unmanaged _deletable);
-      limbo_list = nil;
+      allocated_list = new unmanaged LockFreeLinkedList(unmanaged _token);
+      free_list = new unmanaged LockFreeQueue(unmanaged _token);
       this.complete();
       global_epoch.write(1);
-      /*for i in [1..EBR_EPOCHS] do
-        epoch_list[i] = nil;//new LinkedList(unmanaged _deletable);*/
       for i in [1..EBR_EPOCHS] do
-        epoch_list[i] = nil;
+        limbo_list[i] = new unmanaged LockFreeQueue(unmanaged _deletable);
     }
 
     proc register() : unmanaged _token { // Should be called only once
       var tok = new unmanaged _token(id_counter.fetchAdd(1));
-      while allocated_list_lock.testAndSet() {
-        chpl_task_yield(); // yield processor
-      }
       allocated_list.append(tok);
-      allocated_list_lock.clear();
       return tok;
     }
 
-    proc unregister(tok: unmanaged _token) {
+/*    proc unregister(tok: unmanaged _token) {
       while allocated_list_lock.testAndSet() {
         chpl_task_yield();
       }
@@ -139,7 +130,7 @@ module EpochManager {
         delete x.p;
         delete x;
       }
-    }
+    }*/
   }
 
   class _token {
@@ -153,11 +144,17 @@ module EpochManager {
 
   class _deletable {
     var p: unmanaged object;
-    var next : unmanaged _deletable;
 
     proc init(x : unmanaged object) {
       p = x;
-      next = nil;
     }
+  }
+
+  var a = new unmanaged EpochManager();
+  coforall i in 1..10 {
+    var tok = a.register();
+  }
+  for i in a.allocated_list {
+    writeln(i);
   }
 }
