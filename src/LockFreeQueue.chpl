@@ -9,6 +9,7 @@ module LockFreeQueue {
     type eltType;
     var val : eltType;
     var next : LocalAtomicObject(unmanaged node(eltType));
+    var freeListNext : unmanaged node(eltType);
 
     proc init(val : ?eltType) {
       this.eltType = eltType;
@@ -24,6 +25,7 @@ module LockFreeQueue {
     type objType;
     var _head : LocalAtomicObject(unmanaged node(objType));
     var _tail : LocalAtomicObject(unmanaged node(objType));
+    var _freeListHead : LocalAtomicObject(unmanaged node(objType));
 
     proc init(type objType) {
       this.objType = objType;
@@ -61,8 +63,17 @@ module LockFreeQueue {
           _tail.compareExchangeABA(curr_tail, next.getObject());
         }
         else {
-          if (_head.compareExchangeABA(curr_head, next.getObject())) then
-            return next.getObject().val;
+          if (_head.compareExchangeABA(curr_head, next.getObject())) {
+            var nextObj = next.getObject();
+
+            // Push the node to freelist
+            do {
+              var oldTop = _freeListHead.readABA();
+              nextObj.freeListNext = oldTop.getObject();
+            } while (!_freeListHead.compareExchangeABA(oldTop, nextObj));
+
+            return nextObj.val;
+          }
         }
       }
       return nil;
