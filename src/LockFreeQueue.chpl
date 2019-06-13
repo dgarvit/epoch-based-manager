@@ -35,8 +35,29 @@ module LockFreeQueue {
       _tail.write(_node);
     }
 
+    proc recycle_node() : unmanaged node(objType) {
+      var oldTop : ABA(unmanaged node(objType));
+      do {
+        oldTop = _freeListHead.readABA();
+        if (oldTop.getObject() == nil) {
+          var n = new unmanaged node(objType);
+          writeln("new allocated: " + n:string);
+          return n;
+        }
+        var newTop = oldTop.freeListNext;
+      } while (!_freeListHead.compareExchangeABA(oldTop, newTop));
+      var n = oldTop.getObject();
+      n.next.write(nil);
+      n.freeListNext = nil;
+      writeln("Recycled: " + n:string);
+      return n;
+    }
+
     proc enqueue(newObj : objType) {
-      var n = new unmanaged node(newObj);
+      var n = recycle_node();
+      n.val = newObj;
+
+      // Now enqueue
       while (true) {
         var curr_tail = _tail.readABA();
         var next = curr_tail.next.readABA();
@@ -64,19 +85,20 @@ module LockFreeQueue {
         }
         else {
           if (_head.compareExchangeABA(curr_head, next.getObject())) {
-            var nextObj = next.getObject();
-
-            // Push the node to freelist
-            do {
-              var oldTop = _freeListHead.readABA();
-              nextObj.freeListNext = oldTop.getObject();
-            } while (!_freeListHead.compareExchangeABA(oldTop, nextObj));
-
-            return nextObj.val;
+            var nextObj = curr_head.getObject();
+            retire_node(nextObj);        
+            return next.getObject().val;
           }
         }
       }
       return nil;
+    }
+
+    proc retire_node(nextObj : unmanaged node(objType)) {
+      do {
+        var oldTop = _freeListHead.readABA();
+        nextObj.freeListNext = oldTop.getObject();
+      } while (!_freeListHead.compareExchangeABA(oldTop, nextObj));
     }
 
     iter these() : objType {
@@ -104,4 +126,25 @@ module LockFreeQueue {
       }
     }
   }
+
+  class C {
+    var x : int;
+  }
+
+  var a = new unmanaged LockFreeQueue(unmanaged C);
+  coforall i in 1..10 {
+    var b = new unmanaged C(i);
+    a.enqueue(b);
+  }
+
+  coforall i in 1..12 {
+    writeln(a.dequeue());
+  }
+
+  coforall i in 11..20 {
+    var b = new unmanaged C(i);
+    a.enqueue(b);
+    writeln(a.dequeue());
+  }
+  writeln();
 }
