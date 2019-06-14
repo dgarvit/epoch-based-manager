@@ -89,9 +89,10 @@ module LockFreeQueue {
           _tail.compareExchangeABA(curr_tail, next_node);
         }
         else {
+          var ret_val = next_node.val;
           if (_head.compareExchangeABA(curr_head, next_node)) {
             retire_node(head_node);
-            return next_node.val;
+            return ret_val;
           }
         }
       }
