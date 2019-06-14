@@ -37,16 +37,17 @@ module LockFreeQueue {
 
     proc recycle_node() : unmanaged node(objType) {
       var oldTop : ABA(unmanaged node(objType));
+      var n : unmanaged node(objType);
       do {
         oldTop = _freeListHead.readABA();
-        if (oldTop.getObject() == nil) {
-          var n = new unmanaged node(objType);
+        n = oldTop.getObject();
+        if (n == nil) {
+          n = new unmanaged node(objType);
           writeln("new allocated: " + n:string);
           return n;
         }
-        var newTop = oldTop.freeListNext;
+        var newTop = n.freeListNext;
       } while (!_freeListHead.compareExchangeABA(oldTop, newTop));
-      var n = oldTop.getObject();
       n.next.write(nil);
       n.freeListNext = nil;
       writeln("Recycled: " + n:string);
@@ -76,21 +77,25 @@ module LockFreeQueue {
     proc dequeue() : objType {
       while (true) {
         var curr_head = _head.readABA();
+        var head_node = curr_head.getObject();
         var curr_tail = _tail.readABA();
+        var tail_node = curr_tail.getObject();
         var next = curr_head.next.readABA();
-        if (curr_head.getObject() == curr_tail.getObject()) {
-          if (next.getObject() == nil) then
+        var next_node = next.getObject();
+
+        if (head_node == tail_node) {
+          if (next_node == nil) then
             return nil;
-          _tail.compareExchangeABA(curr_tail, next.getObject());
+          _tail.compareExchangeABA(curr_tail, next_node);
         }
         else {
-          if (_head.compareExchangeABA(curr_head, next.getObject())) {
-            var nextObj = curr_head.getObject();
-            retire_node(nextObj);        
-            return next.getObject().val;
+          if (_head.compareExchangeABA(curr_head, next_node)) {
+            retire_node(head_node);
+            return next_node.val;
           }
         }
       }
+
       return nil;
     }
 
@@ -135,9 +140,6 @@ module LockFreeQueue {
   coforall i in 1..10 {
     var b = new unmanaged C(i);
     a.enqueue(b);
-  }
-
-  coforall i in 1..12 {
     writeln(a.dequeue());
   }
 
