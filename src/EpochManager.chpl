@@ -6,6 +6,7 @@ module EpochManager {
 
   class EpochManager {
     const EBR_EPOCHS : uint = 3;
+    const INACTIVE : uint = 0;
     var global_epoch : atomic uint;
     var allocated_list : unmanaged LockFreeLinkedList(unmanaged _token);
     var free_list : unmanaged LockFreeQueue(unmanaged _token);
@@ -17,24 +18,23 @@ module EpochManager {
       free_list = new unmanaged LockFreeQueue(unmanaged _token);
       this.complete();
       global_epoch.write(1);
-      for i in [1..EBR_EPOCHS] do
-        limbo_list[i] = new unmanaged LockFreeQueue(unmanaged _deletable);
+      limbo_list = new unmanaged LockFreeQueue(unmanaged _deletable);
     }
 
     proc register() : unmanaged _token { // Should be called only once
       var tok = free_list.dequeue();
       if (tok == nil) {
-        tok = new unmanaged _token(id_counter.fetchAdd(1));
+        tok = new unmanaged _token(id_counter.fetchAdd(1), unmanaged this);
         allocated_list.append(tok);
       }
       return tok;
     }
 
     proc unregister(tok: unmanaged _token) {
-      tok.local_epoch.write(0);
+      tok.local_epoch.write(INACTIVE);
       free_list.enqueue(tok);
     }
-/*
+
     proc pin(tok: unmanaged _token) {
       // An inactive task has local_epoch set to 0. A value other than 0
       // implies active task
@@ -42,26 +42,21 @@ module EpochManager {
     }
 
     proc unpin(tok: unmanaged _token) {
-      tok.local_epoch.write(0);
+      tok.local_epoch.write(INACTIVE);
     }
-
+/*
     // Attempt to announce a new epoch
     proc try_advance() : bool {
-      while advance_lock.testAndSet() {
-        chpl_task_yield();
-      }
       var epoch = global_epoch.read();
       for tok in allocated_list {
         var local_epoch = tok.local_epoch.read();
         if (local_epoch > 0 && local_epoch != epoch) {
-          advance_lock.clear();
           return false;
         }
       }
 
       // Advance the global epoch
       global_epoch.write((epoch % EBR_EPOCHS) + 1);
-      advance_lock.clear();
       return true;
     }
 
@@ -74,19 +69,10 @@ module EpochManager {
       return ((ebr_epochs + (epoch-3) % ebr_epochs):uint % EBR_EPOCHS) + 1;
     }
 
-    proc delete_obj(x) {
+    proc delete_obj(tok : unmanaged _token, x) {
       var deletable = new unmanaged _deletable(x);
-      while limbo_list_lock.testAndSet() {
-        chpl_task_yield();
-      }
-      //limbo_list.append(deletable);
-      if (limbo_list == nil) {
-        limbo_list = deletable;
-      } else {
-        deletable.next = limbo_list;
-        limbo_list = deletable;
-      }
-      limbo_list_lock.clear();
+      var local_epoch = tok.local_epoch.read();
+      limbo_list[local_epoch].enqueue(deletable);
     }
 
     proc try_reclaim() {
@@ -98,6 +84,12 @@ module EpochManager {
         count = count - 1;
         if (!try_advance()) {
           return;
+        }
+
+        var reclaim_epoch = this.gc_epoch();
+        var x = limbo_list[reclaim_epoch].dequeue();
+        while (x != nil) {
+          delete x;
         }
 
         var staging_epoch = global_epoch.read();
@@ -135,9 +127,19 @@ module EpochManager {
   class _token {
     var local_epoch : atomic uint;
     const id : uint;
+    var manager : unmanaged EpochManager;
 
-    proc init(x : uint) {
+    proc init(x : uint, manager : unmanaged EpochManager) {
       id = x;
+      this.manager = manager;
+    }
+
+    proc pin() {
+      manager.pin(unmanaged this);
+    }
+
+    proc unpin() {
+      manager.unpin(unmanaged this);
     }
   }
 
@@ -152,25 +154,31 @@ module EpochManager {
   var a = new unmanaged EpochManager();
   coforall i in 1..10 {
     var tok = a.register();
-    a.unregister(tok);
+    tok.pin();
+    writeln(tok.id:string + " " + tok.local_epoch.read():string);
+    tok.unpin();
+    writeln(tok.id:string + " " + tok.local_epoch.read():string);
   }
-  for i in a.allocated_list {
+  // writeln(a);
+  /*coforall i in 1..20 {
+    var tok = a.register();
+    a.pin(tok);
+    if (a.try_advance()) {
+      writeln("Advanced. " + a.global_epoch.read():string);
+      for ii in a.allocated_list {
+    writeln("Allocated List : " + ii:string);
+  }
+    }
+    else {
+      writeln("Cannot advance. " + a.global_epoch.read():string);
+    }
+    a.unregister(tok);
+  }*/
+  /*for i in a.allocated_list {
     writeln("Allocated List : " + i:string);
   }
   writeln();
   for i in a.free_list {
     writeln("Free list : " + i:string);
-  }
-
-
-  coforall i in 11..15 {
-    var tok = a.register();
-  }
-  for i in a.allocated_list {
-    writeln("Allocated List 2 : " + i:string);
-  }
-  writeln();
-  for i in a.free_list {
-    writeln("Free List 2 : " + i:string);
-  }
+  }*/
 }
