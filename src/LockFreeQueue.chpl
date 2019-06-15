@@ -43,14 +43,12 @@ module LockFreeQueue {
         n = oldTop.getObject();
         if (n == nil) {
           n = new unmanaged node(objType);
-          writeln("new allocated: " + n:string);
           return n;
         }
         var newTop = n.freeListNext;
       } while (!_freeListHead.compareExchangeABA(oldTop, newTop));
       n.next.write(nil);
       n.freeListNext = nil;
-      writeln("Recycled: " + n:string);
       return n;
     }
 
@@ -101,6 +99,7 @@ module LockFreeQueue {
     }
 
     proc retire_node(nextObj : unmanaged node(objType)) {
+      nextObj.val = nil;
       do {
         var oldTop = _freeListHead.readABA();
         nextObj.freeListNext = oldTop.getObject();
@@ -130,24 +129,13 @@ module LockFreeQueue {
         delete ptr;
         ptr = _head.read();
       }
+
+      ptr = _freeListHead.read();
+      while (ptr != nil) {
+        var head = ptr.freeListNext;
+        delete ptr;
+        ptr = head;
+      }
     }
   }
-
-  class C {
-    var x : int;
-  }
-
-  var a = new unmanaged LockFreeQueue(unmanaged C);
-  coforall i in 1..10 {
-    var b = new unmanaged C(i);
-    a.enqueue(b);
-    writeln(a.dequeue());
-  }
-
-  coforall i in 11..20 {
-    var b = new unmanaged C(i);
-    a.enqueue(b);
-    writeln(a.dequeue());
-  }
-  writeln();
 }
