@@ -154,9 +154,9 @@ module EpochManager {
   }
 
   class _deletable {
-    var p: object;
+    var p: unmanaged object;
 
-    proc init(x : object) {
+    proc init(x : unmanaged object) {
       p = x;
     }
   }
@@ -177,12 +177,12 @@ module EpochManager {
   var a = new unmanaged EpochManager();
   coforall i in 1..10 {
     var tok = a.register();
-    var b = new C(i);
+    var b = new unmanaged C(i);
     /*tok.pin();
     writeln(tok.id:string + " " + tok.local_epoch.read():string);
     tok.unpin();
     writeln(tok.id:string + " " + tok.local_epoch.read():string);*/
-    a.delete_obj(tok, b);
+    tok.delete_obj(b);
     a.unregister(tok);
   }
   writeln(a.limbo_list[1]);
