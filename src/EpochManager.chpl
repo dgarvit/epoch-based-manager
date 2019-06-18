@@ -49,7 +49,7 @@ module EpochManager {
     // Attempt to announce a new epoch
     proc try_advance() : bool {
       if (is_setting_epoch.testAndSet()) then
-        return;
+        return false;
       var epoch = global_epoch.read();
       for tok in allocated_list {
         var local_epoch = tok.local_epoch.read();
@@ -73,13 +73,14 @@ module EpochManager {
       // It is safe to reclaim from e-2 epoch
       return ((ebr_epochs + (epoch-3) % ebr_epochs):uint % EBR_EPOCHS) + 1;
     }
-/*
+
     proc delete_obj(tok : unmanaged _token, x) {
       var deletable = new unmanaged _deletable(x);
-      var local_epoch = tok.local_epoch.read();
-      limbo_list[local_epoch].enqueue(deletable);
+      var globalEpoch = global_epoch.read();
+      limbo_list[globalEpoch].enqueue(deletable);
+      writeln(globalEpoch:string + ": " + limbo_list[globalEpoch]:string);
     }
-
+/*
     proc try_reclaim() {
       var count = EBR_EPOCHS;
 
@@ -146,24 +147,45 @@ module EpochManager {
     proc unpin() {
       manager.unpin(this:unmanaged);
     }
+
+    proc delete_obj(x) {
+      manager.delete_obj(this:unmanaged, x);
+    }
   }
 
   class _deletable {
-    var p: unmanaged object;
+    var p: object;
 
-    proc init(x : unmanaged object) {
+    proc init(x : object) {
       p = x;
     }
   }
 
+  class C {
+    var x : int;
+  }
+
+  // var a = new unmanaged LockFreeQueue(unmanaged _deletable);
+  // coforall i in 1..10 {
+  //   var b = new unmanaged C(i);
+  //   var c = new unmanaged _deletable(b);
+  //   a.enqueue(c);
+  // }
+
+  // writeln(a);
+
   var a = new unmanaged EpochManager();
   coforall i in 1..10 {
     var tok = a.register();
-    tok.pin();
+    var b = new C(i);
+    /*tok.pin();
     writeln(tok.id:string + " " + tok.local_epoch.read():string);
     tok.unpin();
-    writeln(tok.id:string + " " + tok.local_epoch.read():string);
+    writeln(tok.id:string + " " + tok.local_epoch.read():string);*/
+    a.delete_obj(tok, b);
+    a.unregister(tok);
   }
+  writeln(a.limbo_list[1]);
   // writeln(a);
   /*coforall i in 1..20 {
     var tok = a.register();
