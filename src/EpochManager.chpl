@@ -8,6 +8,7 @@ module EpochManager {
     const EBR_EPOCHS : uint = 3;
     const INACTIVE : uint = 0;
     var global_epoch : atomic uint;
+    var is_setting_epoch : atomic bool;
     var allocated_list : unmanaged LockFreeLinkedList(unmanaged _token);
     var free_list : unmanaged LockFreeQueue(unmanaged _token);
     var limbo_list : [1..EBR_EPOCHS] unmanaged LockFreeQueue(unmanaged _deletable);
@@ -47,17 +48,21 @@ module EpochManager {
 
     // Attempt to announce a new epoch
     proc try_advance() : bool {
+      if (is_setting_epoch.testAndSet()) then
+        return;
       var epoch = global_epoch.read();
-      var new_epoch = (epoch % EBR_EPOCHS) + 1;
       for tok in allocated_list {
         var local_epoch = tok.local_epoch.read();
         if (local_epoch > 0 && local_epoch != epoch) {
+          is_setting_epoch.clear();
           return false;
         }
       }
 
       // Advance the global epoch
-      return global_epoch.compareExchange(epoch, new_epoch);
+      global_epoch.write((epoch % EBR_EPOCHS) + 1);
+      is_setting_epoch.clear();
+      return true;
     }
 
     // Return epoch which is safe to be reclaimed
