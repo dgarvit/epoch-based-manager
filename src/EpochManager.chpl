@@ -24,7 +24,7 @@ module EpochManager {
     proc register() : unmanaged _token { // Should be called only once
       var tok = free_list.dequeue();
       if (tok == nil) {
-        tok = new unmanaged _token(id_counter.fetchAdd(1), unmanaged this);
+        tok = new unmanaged _token(id_counter.fetchAdd(1), this:unmanaged);
         allocated_list.append(tok);
       }
       return tok;
@@ -44,10 +44,11 @@ module EpochManager {
     proc unpin(tok: unmanaged _token) {
       tok.local_epoch.write(INACTIVE);
     }
-/*
+
     // Attempt to announce a new epoch
     proc try_advance() : bool {
       var epoch = global_epoch.read();
+      var new_epoch = (epoch % EBR_EPOCHS) + 1;
       for tok in allocated_list {
         var local_epoch = tok.local_epoch.read();
         if (local_epoch > 0 && local_epoch != epoch) {
@@ -56,8 +57,7 @@ module EpochManager {
       }
 
       // Advance the global epoch
-      global_epoch.write((epoch % EBR_EPOCHS) + 1);
-      return true;
+      return global_epoch.compareExchange(epoch, new_epoch);
     }
 
     // Return epoch which is safe to be reclaimed
@@ -68,7 +68,7 @@ module EpochManager {
       // It is safe to reclaim from e-2 epoch
       return ((ebr_epochs + (epoch-3) % ebr_epochs):uint % EBR_EPOCHS) + 1;
     }
-
+/*
     proc delete_obj(tok : unmanaged _token, x) {
       var deletable = new unmanaged _deletable(x);
       var local_epoch = tok.local_epoch.read();
@@ -135,11 +135,11 @@ module EpochManager {
     }
 
     proc pin() {
-      manager.pin(unmanaged this);
+      manager.pin(this:unmanaged);
     }
 
     proc unpin() {
-      manager.unpin(unmanaged this);
+      manager.unpin(this:unmanaged);
     }
   }
 
