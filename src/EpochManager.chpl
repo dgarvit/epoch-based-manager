@@ -78,7 +78,7 @@ module EpochManager {
       var globalEpoch = global_epoch.read();
       limbo_list[globalEpoch].enqueue(x);
     }
-/*
+
     proc try_reclaim() {
       var count = EBR_EPOCHS;
 
@@ -91,41 +91,14 @@ module EpochManager {
         }
 
         var reclaim_epoch = this.gc_epoch();
-        var x = limbo_list[reclaim_epoch].dequeue();
+        var reclaim_limbo_list = limbo_list[reclaim_epoch];
+        var x = reclaim_limbo_list.dequeue();
         while (x != nil) {
           delete x;
-        }
-
-        var staging_epoch = global_epoch.read();
-        if (epoch_list[staging_epoch] != nil) {
-          writeln("Error: List not empty.");
-          //exit();
-        }
-
-        while limbo_list_lock.testAndSet() {
-          chpl_task_yield();
-        }
-        epoch_list[staging_epoch] = limbo_list;
-        limbo_list = nil;
-        limbo_list_lock.clear();
-
-        var gc_list = epoch_list[staging_epoch];
-        if (gc_list != nil) {
-          _reclaim(gc_list);
-          epoch_list[staging_epoch] = nil;
-          break;
+          x = reclaim_limbo_list.dequeue();
         }
       }
     }
-
-    proc _reclaim(inout gc_list : unmanaged _deletable) {
-      while (gc_list != nil) {
-        var x = gc_list;
-        gc_list = gc_list.next;
-        delete x.p;
-        delete x;
-      }
-    }*/
   }
 
   class _token {
@@ -149,53 +122,27 @@ module EpochManager {
     proc delete_obj(x) {
       manager.delete_obj(this:unmanaged, x);
     }
+
+    proc try_reclaim() {
+      manager.try_reclaim();
+    }
   }
 
   class C {
     var x : int;
+    proc deinit() {
+      writeln("Deinit: " + this:string);
+    }
   }
-
-  // var a = new unmanaged LockFreeQueue(unmanaged _deletable);
-  // coforall i in 1..10 {
-  //   var b = new unmanaged C(i);
-  //   var c = new unmanaged _deletable(b);
-  //   a.enqueue(c);
-  // }
-
-  // writeln(a);
 
   var a = new unmanaged EpochManager();
   coforall i in 1..10 {
     var tok = a.register();
     var b = new unmanaged C(i);
-    /*tok.pin();
-    writeln(tok.id:string + " " + tok.local_epoch.read():string);
-    tok.unpin();
-    writeln(tok.id:string + " " + tok.local_epoch.read():string);*/
+    tok.pin();
+    tok.try_reclaim();
     tok.delete_obj(b);
     a.unregister(tok);
   }
-  writeln(a.limbo_list[1]);
-  // writeln(a);
-  /*coforall i in 1..20 {
-    var tok = a.register();
-    a.pin(tok);
-    if (a.try_advance()) {
-      writeln("Advanced. " + a.global_epoch.read():string);
-      for ii in a.allocated_list {
-    writeln("Allocated List : " + ii:string);
-  }
-    }
-    else {
-      writeln("Cannot advance. " + a.global_epoch.read():string);
-    }
-    a.unregister(tok);
-  }*/
-  /*for i in a.allocated_list {
-    writeln("Allocated List : " + i:string);
-  }
-  writeln();
-  for i in a.free_list {
-    writeln("Free list : " + i:string);
-  }*/
+  a.try_reclaim();
 }
