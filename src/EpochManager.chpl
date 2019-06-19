@@ -11,7 +11,7 @@ module EpochManager {
     var is_setting_epoch : atomic bool;
     var allocated_list : unmanaged LockFreeLinkedList(unmanaged _token);
     var free_list : unmanaged LockFreeQueue(unmanaged _token);
-    var limbo_list : [1..EBR_EPOCHS] unmanaged LockFreeQueue(unmanaged _deletable);
+    var limbo_list : [1..EBR_EPOCHS] unmanaged LockFreeQueue(unmanaged object);
     var id_counter : atomic uint;
 
     proc init() {
@@ -19,7 +19,7 @@ module EpochManager {
       free_list = new unmanaged LockFreeQueue(unmanaged _token);
       this.complete();
       global_epoch.write(1);
-      limbo_list = new unmanaged LockFreeQueue(unmanaged _deletable);
+      limbo_list = new unmanaged LockFreeQueue(unmanaged object);
     }
 
     proc register() : unmanaged _token { // Should be called only once
@@ -74,11 +74,9 @@ module EpochManager {
       return ((ebr_epochs + (epoch-3) % ebr_epochs):uint % EBR_EPOCHS) + 1;
     }
 
-    proc delete_obj(tok : unmanaged _token, x) {
-      var deletable = new unmanaged _deletable(x);
+    proc delete_obj(tok : unmanaged _token, x : unmanaged object) {
       var globalEpoch = global_epoch.read();
-      limbo_list[globalEpoch].enqueue(deletable);
-      writeln(globalEpoch:string + ": " + limbo_list[globalEpoch]:string);
+      limbo_list[globalEpoch].enqueue(x);
     }
 /*
     proc try_reclaim() {
@@ -150,14 +148,6 @@ module EpochManager {
 
     proc delete_obj(x) {
       manager.delete_obj(this:unmanaged, x);
-    }
-  }
-
-  class _deletable {
-    var p: unmanaged object;
-
-    proc init(x : unmanaged object) {
-      p = x;
     }
   }
 
