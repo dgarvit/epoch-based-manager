@@ -47,31 +47,32 @@ module EpochManager {
     }
 
     // Attempt to announce a new epoch
-    proc try_advance() : bool {
+    proc try_advance() : uint {
+      // Set a flag to let other tasks know that a task is already
+      // trying to advance the global epoch
       if (is_setting_epoch.testAndSet()) then
-        return false;
+        return 0;
       var epoch = global_epoch.read();
       for tok in allocated_list {
         var local_epoch = tok.local_epoch.read();
         if (local_epoch > 0 && local_epoch != epoch) {
           is_setting_epoch.clear();
-          return false;
+          return 0;
         }
       }
 
       // Advance the global epoch
-      global_epoch.write((epoch % EBR_EPOCHS) + 1);
+      epoch = (epoch % EBR_EPOCHS) + 1;
+      global_epoch.write(epoch);
       is_setting_epoch.clear();
-      return true;
-    }
 
-    // Return epoch which is safe to be reclaimed
-    proc gc_epoch() : uint {
-      var epoch = global_epoch.read() : int;
-      var ebr_epochs = EBR_EPOCHS : int;
-
-      // It is safe to reclaim from e-2 epoch
-      return ((ebr_epochs + (epoch-3) % ebr_epochs):uint % EBR_EPOCHS) + 1;
+      // Return epoch which is safe to be reclaimed. It is safe to
+      // reclaim from e-2 epoch
+      select epoch {
+        when 1 do return EBR_EPOCHS - 1;
+        when 2 do return EBR_EPOCHS;
+        otherwise do return epoch - 2;
+      }
     }
 
     proc delete_obj(tok : unmanaged _token, x : unmanaged object) {
@@ -86,11 +87,11 @@ module EpochManager {
       // full cycle
       while (count) {
         count = count - 1;
-        if (!try_advance()) {
+        var reclaim_epoch = try_advance();
+        if (reclaim_epoch == 0) then
+          // try_advance failed
           return;
-        }
 
-        var reclaim_epoch = this.gc_epoch();
         var reclaim_limbo_list = limbo_list[reclaim_epoch];
         var x = reclaim_limbo_list.dequeue();
         while (x != nil) {
