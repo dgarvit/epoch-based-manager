@@ -26,9 +26,22 @@ module LockFreeQueue {
     var _head : LocalAtomicObject(unmanaged node(objType));
     var _tail : LocalAtomicObject(unmanaged node(objType));
     var _freeListHead : LocalAtomicObject(unmanaged node(objType));
+    // Flag to set if objects held in the queue are to be deleted or not.
+    // By default initialised to true.
+    const delete_val : bool;
 
     proc init(type objType) {
       this.objType = objType;
+      delete_val = true;
+      this.complete();
+      var _node = new unmanaged node(objType);
+      _head.write(_node);
+      _tail.write(_node);
+    }
+
+    proc init(type objType, delete_val : bool) {
+      this.objType = objType;
+      this.delete_val = delete_val;
       this.complete();
       var _node = new unmanaged node(objType);
       _head.write(_node);
@@ -98,6 +111,7 @@ module LockFreeQueue {
       return nil;
     }
 
+    // TODO: Reclaim retired nodes after a while
     proc retire_node(nextObj : unmanaged node(objType)) {
       nextObj.val = nil;
       do {
@@ -123,11 +137,19 @@ module LockFreeQueue {
 
     proc deinit() {
       var ptr = _head.read();
-      while (ptr != nil) {
-        _head = ptr.next;
-        delete ptr.val;
-        delete ptr;
-        ptr = _head.read();
+      if (delete_val) {
+        while (ptr != nil) {
+          _head = ptr.next;
+          delete ptr.val;
+          delete ptr;
+          ptr = _head.read();
+        }
+      } else {
+        while (ptr != nil) {
+          _head = ptr.next;
+          delete ptr;
+          ptr = _head.read();
+        }
       }
 
       ptr = _freeListHead.read();
