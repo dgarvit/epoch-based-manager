@@ -20,13 +20,14 @@ module EpochManager {
       this.complete();
 
       // Initialise the free list pool with here.maxTaskPar tokens
-      coforall i in 1..here.maxTaskPar {
-        var tok = new unmanaged _token(id_counter.fetchAdd(1), this:unmanaged);
+      forall i in 0..#here.maxTaskPar {
+        var tok = new unmanaged _token(i:uint, this:unmanaged);
         allocated_list.append(tok);
         free_list.enqueue(tok);
       }
+      id_counter.write(here.maxTaskPar:uint);
       global_epoch.write(1);
-      for i in 1..EBR_EPOCHS do
+      forall i in 1..EBR_EPOCHS do
         limbo_list[i] = new unmanaged LockFreeQueue(unmanaged object);
     }
 
@@ -177,6 +178,5 @@ module EpochManager {
     a.unregister(tok);
   }
   a.try_reclaim();
-
   delete a;
 }
