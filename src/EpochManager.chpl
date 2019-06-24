@@ -16,16 +16,18 @@ module EpochManager {
 
     proc init() {
       allocated_list = new unmanaged LockFreeLinkedList(unmanaged _token);
-      free_list = new unmanaged LockFreeQueue(unmanaged _token);
+      free_list = new unmanaged LockFreeQueue(unmanaged _token, false);
       this.complete();
 
       // Initialise the free list pool with here.maxTaskPar tokens
       coforall i in 1..here.maxTaskPar {
         var tok = new unmanaged _token(id_counter.fetchAdd(1), this:unmanaged);
+        allocated_list.append(tok);
         free_list.enqueue(tok);
       }
       global_epoch.write(1);
-      limbo_list = new unmanaged LockFreeQueue(unmanaged object);
+      for i in 1..EBR_EPOCHS do
+        limbo_list[i] = new unmanaged LockFreeQueue(unmanaged object);
     }
 
     proc register() : unmanaged _token { // Should be called only once
@@ -123,6 +125,12 @@ module EpochManager {
         }
       }
     }
+
+    proc deinit() {
+      delete allocated_list;
+      delete free_list;
+      delete limbo_list;
+    }
   }
 
   class _token {
@@ -169,4 +177,6 @@ module EpochManager {
     a.unregister(tok);
   }
   a.try_reclaim();
+
+  delete a;
 }
