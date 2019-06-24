@@ -18,6 +18,12 @@ module EpochManager {
       allocated_list = new unmanaged LockFreeLinkedList(unmanaged _token);
       free_list = new unmanaged LockFreeQueue(unmanaged _token);
       this.complete();
+
+      // Initialise the free list pool with here.maxTaskPar tokens
+      coforall i in 1..here.maxTaskPar {
+        var tok = new unmanaged _token(id_counter.fetchAdd(1), this:unmanaged);
+        free_list.enqueue(tok);
+      }
       global_epoch.write(1);
       limbo_list = new unmanaged LockFreeQueue(unmanaged object);
     }
