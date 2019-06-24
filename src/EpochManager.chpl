@@ -48,23 +48,16 @@ module EpochManager {
 
     // Attempt to announce a new epoch
     proc try_advance() : uint {
-      // Set a flag to let other tasks know that a task is already
-      // trying to advance the global epoch
-      if (is_setting_epoch.testAndSet()) then
-        return 0;
       var epoch = global_epoch.read();
       for tok in allocated_list {
         var local_epoch = tok.local_epoch.read();
-        if (local_epoch > 0 && local_epoch != epoch) {
-          is_setting_epoch.clear();
+        if (local_epoch > 0 && local_epoch != epoch) then
           return 0;
-        }
       }
 
       // Advance the global epoch
       epoch = (epoch % EBR_EPOCHS) + 1;
       global_epoch.write(epoch);
-      is_setting_epoch.clear();
 
       // Return epoch which is safe to be reclaimed. It is safe to
       // reclaim from e-2 epoch
@@ -87,16 +80,40 @@ module EpochManager {
       // full cycle
       while (count) {
         count = count - 1;
-        var reclaim_epoch = try_advance();
-        if (reclaim_epoch == 0) then
-          // try_advance failed
+
+        // Set a flag to let other tasks know that a task is already
+        // trying to reclaim
+        if (is_setting_epoch.testAndSet()) {
           return;
+        }
+        var reclaim_epoch = try_advance();
+        if (reclaim_epoch == 0) {
+          // try_advance failed
+          is_setting_epoch.clear();
+          return;
+        }
 
         var reclaim_limbo_list = limbo_list[reclaim_epoch];
-        var x = reclaim_limbo_list.dequeue();
+        var curr_head = reclaim_limbo_list._head.read();
+        var next_node = curr_head.next.read();
+        if (next_node == nil) {
+          is_setting_epoch.clear();
+          continue;
+        }
+        var tail = reclaim_limbo_list._tail;
+        curr_head.next.write(nil);
+        // CAS the tail to head, effectively marking the queue empty
+        do {
+          var curr_tail = reclaim_limbo_list._tail.read();
+        } while (!reclaim_limbo_list._tail.compareExchange(curr_tail, curr_head));
+        is_setting_epoch.clear();
+
+        var x = next_node;
         while (x != nil) {
-          delete x;
-          x = reclaim_limbo_list.dequeue();
+          next_node = x.next.read();
+          delete x.val;
+          reclaim_limbo_list.retire_node(x);
+          x = next_node;
         }
       }
     }
