@@ -3,6 +3,7 @@ module EpochManager {
 
   use LockFreeLinkedList;
   use LockFreeQueue;
+  use LimboList;
 
   class EpochManager {
     const EBR_EPOCHS : uint = 3;
@@ -11,7 +12,7 @@ module EpochManager {
     var is_setting_epoch : atomic bool;
     var allocated_list : unmanaged LockFreeLinkedList(unmanaged _token);
     var free_list : unmanaged LockFreeQueue(unmanaged _token);
-    var limbo_list : [1..EBR_EPOCHS] unmanaged LockFreeQueue(unmanaged object);
+    var limbo_list : [1..EBR_EPOCHS] unmanaged LimboList();
     var id_counter : atomic uint;
 
     proc init() {
@@ -28,7 +29,7 @@ module EpochManager {
       id_counter.write(here.maxTaskPar:uint);
       global_epoch.write(1);
       forall i in 1..EBR_EPOCHS do
-        limbo_list[i] = new unmanaged LockFreeQueue(unmanaged object);
+        limbo_list[i] = new unmanaged LimboList();
     }
 
     proc register() : unmanaged _token { // Should be called only once
@@ -79,7 +80,7 @@ module EpochManager {
 
     proc delete_obj(tok : unmanaged _token, x : unmanaged object) {
       var globalEpoch = global_epoch.read();
-      limbo_list[globalEpoch].enqueue(x);
+      limbo_list[globalEpoch].push(x);
     }
 
     proc try_reclaim() {
@@ -103,26 +104,14 @@ module EpochManager {
         }
 
         var reclaim_limbo_list = limbo_list[reclaim_epoch];
-        var curr_head = reclaim_limbo_list._head.read();
-        var next_node = curr_head.next.read();
-        if (next_node == nil) {
-          is_setting_epoch.clear();
-          continue;
-        }
-        var tail = reclaim_limbo_list._tail;
-        curr_head.next.write(nil);
-        // CAS the tail to head, effectively marking the queue empty
-        do {
-          var curr_tail = reclaim_limbo_list._tail.read();
-        } while (!reclaim_limbo_list._tail.compareExchange(curr_tail, curr_head));
+        var head = reclaim_limbo_list.pop();
         is_setting_epoch.clear();
 
-        var x = next_node;
-        while (x != nil) {
-          next_node = x.next.read();
-          delete x.val;
-          reclaim_limbo_list.retire_node(x);
-          x = next_node;
+        while (head != nil) {
+          var next = head.next;
+          delete head.val;
+          reclaim_limbo_list.retire_node(head);
+          head = next;
         }
       }
     }
