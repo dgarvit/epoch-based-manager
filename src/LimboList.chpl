@@ -48,6 +48,16 @@ module LimboList {
     proc pop() {
       return _head.exchange(nil);
     }
+
+    proc deinit() {
+      var ptr = _head.read();
+      while (ptr != nil) {
+        var next = ptr.next;
+        delete ptr.val;
+        delete ptr;
+        ptr = next;
+      }
+    }
   }
 
   class C {
@@ -55,7 +65,7 @@ module LimboList {
   }
 
   proc main() {
-    var a = new LimboList();
+    var a = new unmanaged LimboList();
     coforall i in 1..4 {
       var b = new unmanaged C(i);
       a.push(b);
@@ -84,5 +94,6 @@ module LimboList {
       c = d;
     }
     writeln(a);
+    delete a;
   }
 }
