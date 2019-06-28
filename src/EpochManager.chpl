@@ -49,7 +49,7 @@ module EpochManager {
     proc pin(tok: unmanaged _token) {
       // An inactive task has local_epoch set to 0. A value other than 0
       // implies active task
-      tok.local_epoch.write(global_epoch.read());
+      tok.local_epoch.compareExchange(0, global_epoch.read());
     }
 
     proc unpin(tok: unmanaged _token) {
@@ -157,15 +157,17 @@ module EpochManager {
     }
   }
 
-  var a = new unmanaged EpochManager();
-  coforall i in 1..10 {
-    var tok = a.register();
-    var b = new unmanaged C(i);
-    tok.pin();
-    tok.try_reclaim();
-    tok.delete_obj(b);
-    a.unregister(tok);
+  proc main() {
+    var a = new unmanaged EpochManager();
+    coforall i in 1..10 {
+      var tok = a.register();
+      var b = new unmanaged C(i);
+      tok.pin();
+      tok.try_reclaim();
+      tok.delete_obj(b);
+      a.unregister(tok);
+    }
+    a.try_reclaim();
+    delete a;
   }
-  a.try_reclaim();
-  delete a;
 }
