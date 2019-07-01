@@ -49,7 +49,8 @@ module EpochManager {
     proc pin(tok: unmanaged _token) {
       // An inactive task has local_epoch set to 0. A value other than 0
       // implies active task
-      tok.local_epoch.compareExchange(0, global_epoch.read());
+      if (tok.local_epoch.read() == 0) then
+        tok.local_epoch.write(global_epoch.read());
     }
 
     proc unpin(tok: unmanaged _token) {
@@ -79,8 +80,12 @@ module EpochManager {
     }
 
     proc delete_obj(tok : unmanaged _token, x : unmanaged object) {
-      var globalEpoch = global_epoch.read();
-      limbo_list[globalEpoch].push(x);
+      var del_epoch = tok.local_epoch.read();
+      if (del_epoch == 0) {
+        writeln("Bad local epoch! Please pin! Using global epoch!");
+        del_epoch = global_epoch.read();
+      }
+      limbo_list[del_epoch].push(x);
     }
 
     proc try_reclaim() {
