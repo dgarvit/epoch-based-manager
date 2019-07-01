@@ -94,5 +94,30 @@ module LockFreeQueue {
       writeln(a.dequeue(tok));
       manager.unregister(tok);
     }
+
+    coforall i in 11..20 {
+      var tok = manager.register();
+      if i%2 {
+        var b = new unmanaged C(i);
+        a.enqueue(b, tok);
+      }
+      else {
+        writeln(a.dequeue(tok));
+      }
+      manager.unregister(tok);
+    }
+
+    coforall i in 21..30 {
+      var tok = manager.register();
+      var b = new unmanaged C(i);
+      a.enqueue(b, tok);
+      manager.unregister(tok);
+    }
+
+    coforall i in 31..40 {
+      var tok = manager.register();
+      writeln(a.dequeue(tok));
+      manager.unregister(tok);
+    }
   }
 }
