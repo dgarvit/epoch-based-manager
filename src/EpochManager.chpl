@@ -153,6 +153,10 @@ module EpochManager {
     proc try_reclaim() {
       manager.try_reclaim();
     }
+
+    proc unregister() {
+      manager.unregister(this:unmanaged);
+    }
   }
 
   class C {
