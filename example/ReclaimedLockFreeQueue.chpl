@@ -1,4 +1,4 @@
-module LockFreeQueue {
+module ReclaimedLockFreeQueue {
 
   use EpochManager;
   use LocalAtomics;
@@ -18,10 +18,25 @@ module LockFreeQueue {
     }
   }
 
-  class LockFreeQueue {
+  class TokenWrapper {
+    var _tok : unmanaged _token;
+    
+    proc init(_tok : unmanaged _token) {
+      this._tok = _tok;
+    }
+
+    proc deinit() {
+      _tok.unregister();
+    }
+    
+    forwarding _tok;
+  }
+
+  class ReclaimedLockFreeQueue {
     type objType;
     var _head : LocalAtomicObject(unmanaged node(objType));
     var _tail : LocalAtomicObject(unmanaged node(objType));
+    var _manager = new owned EpochManager();
 
     proc init(type objType) {
       this.objType = objType;
@@ -31,7 +46,11 @@ module LockFreeQueue {
       _tail.write(_node);
     }
 
-    proc enqueue(newObj : objType, tok : unmanaged _token) {
+    proc getToken() {
+      return new owned TokenWrapper(_manager.register());
+    }
+
+    proc enqueue(newObj : objType, tok) {
       var n = new unmanaged node(newObj);
       tok.pin();
       while (true) {
@@ -50,7 +69,7 @@ module LockFreeQueue {
       tok.unpin();
     }
 
-    proc dequeue(tok : unmanaged _token) : objType {
+    proc dequeue(tok) : (bool, objType) {
       tok.pin();
       while (true) {
         var curr_head = _head.read();
@@ -60,7 +79,8 @@ module LockFreeQueue {
         if (curr_head == curr_tail) {
           if (next_node == nil) {
             tok.unpin();
-            return nil;
+            var retval : objType;
+            return (false, retval);
           }
           _tail.compareExchange(curr_tail, next_node);
         }
@@ -69,55 +89,45 @@ module LockFreeQueue {
           if (_head.compareExchange(curr_head, next_node)) {
             tok.delete_obj(curr_head);
             tok.unpin();
-            return ret_val;
+            return (true, ret_val);
           }
         }
       }
 
       tok.unpin();
-      return nil;
+      var retval : objType;
+      return (false, retval);
     }
 
   }
 
-  class C {
-    var x : int;
-  }
+  config const InitialQueueSize = 1024 * 1024;
+  config const OperationsPerThread = 1024 * 1024;
+  
+  use Time;
 
   proc main() {
-    var a = new unmanaged LockFreeQueue(unmanaged C);
-    var manager = new unmanaged EpochManager();
-    coforall i in 1..10 {
-      var tok = manager.register();
-      var b = new unmanaged C(i);
-      a.enqueue(b, tok);
-      writeln(a.dequeue(tok));
-      manager.unregister(tok);
-    }
+    var lfq = new unmanaged ReclaimedLockFreeQueue(int);
+    var timer = new Timer();
 
-    coforall i in 11..20 {
-      var tok = manager.register();
-      if i%2 {
-        var b = new unmanaged C(i);
-        a.enqueue(b, tok);
+    // Fill the queue and warm up the cache.
+    timer.start();
+    forall i in 1..InitialQueueSize with (var tok = lfq.getToken()) do lfq.enqueue(i, tok);
+    timer.stop();
+    writeln("Queue was initialized to a size of ", InitialQueueSize, " in ", timer.elapsed());
+    timer.clear();
+
+    timer.start();
+    coforall tid in 1..here.maxTaskPar {
+      var tok = lfq.getToken();
+      // Even tasks handle enqueue, odd tasks handle dequeue...
+      if tid % 2 == 0 {
+        for i in 1..OperationsPerThread do lfq.enqueue(i, tok);
+      } else {
+        for i in 1..OperationsPerThread do lfq.dequeue(tok);
       }
-      else {
-        writeln(a.dequeue(tok));
-      }
-      manager.unregister(tok);
     }
-
-    coforall i in 21..30 {
-      var tok = manager.register();
-      var b = new unmanaged C(i);
-      a.enqueue(b, tok);
-      manager.unregister(tok);
-    }
-
-    coforall i in 31..40 {
-      var tok = manager.register();
-      writeln(a.dequeue(tok));
-      manager.unregister(tok);
-    }
+    timer.stop();
+    writeln("Performed ", OperationsPerThread, " operations per task with ", here.maxTaskPar, " tasks for a total of ", here.maxTaskPar * OperationsPerThread, " operations in a total of ", timer.elapsed(), "s");
   }
 }
