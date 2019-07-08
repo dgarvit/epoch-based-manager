@@ -15,13 +15,33 @@ module TwoLockQueue {
     }
   }
 
+  pragma "no doc"
+  pragma "default intent is ref"
+  record Lock {
+    var _lock : chpl__processorAtomicType(bool);
+
+    inline proc acquire() {
+      on this do local {
+        if _lock.testAndSet() == true { 
+          while _lock.read() == true || _lock.testAndSet() == true {
+            chpl_task_yield();
+          }
+        }
+      }
+    }
+
+    inline proc release() {
+      on this do local do _lock.clear();
+    }
+  }
+
   class TwoLockQueue {
     type objType;
     var _head : unmanaged node(objType);
     var _tail : unmanaged node(objType);
 
-    var h_lock : atomic bool;
-    var t_lock : atomic bool;
+    var h_lock : Lock;
+    var t_lock : Lock;
 
     proc init(type objType) {
       this.objType = objType;
@@ -32,29 +52,25 @@ module TwoLockQueue {
 
     proc enqueue(newObj : objType) {
       var n = new unmanaged node(newObj);
-      while t_lock.testAndSet() {
-        chpl_task_yield();
-      }
+      t_lock.acquire();
       _tail.next = n;
       _tail = n;
-      t_lock.clear();
+      t_lock.release();
     }
 
     proc dequeue() : (bool, objType) {
-      while h_lock.testAndSet() {
-        chpl_task_yield();
-      }
+      h_lock.acquire();
       var n = _head;
       var new_head = n.next;
       if (new_head == nil) {
-        h_lock.clear();
+        h_lock.release();
         var retval : objType;
         return (false, retval);
       }
       var retval = new_head.val;
       delete _head;
       _head = new_head;
-      h_lock.clear();
+      h_lock.release();
       return (true, retval);
     }
   }
