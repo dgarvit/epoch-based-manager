@@ -87,23 +87,26 @@ module LockFreeQueue {
 
     proc dequeue() : objType {
       while (true) {
-        var curr_head = _head.readABA();
-        var head_node = curr_head.getObject();
+        var head = _head.readABA();
+        var head_node = head.getObject();
         var curr_tail = _tail.readABA();
         var tail_node = curr_tail.getObject();
-        var next = curr_head.next.readABA();
+        var next = head.next.readABA();
         var next_node = next.getObject();
+        var curr_head = _head.readABA();
 
-        if (head_node == tail_node) {
-          if (next_node == nil) then
-            return nil;
-          _tail.compareExchangeABA(curr_tail, next_node);
-        }
-        else {
-          var ret_val = next_node.val;
-          if (_head.compareExchangeABA(curr_head, next_node)) {
-            retire_node(head_node);
-            return ret_val;
+        if (head == curr_head) {
+          if (head_node == tail_node) {
+            if (next_node == nil) then
+              return nil;
+            _tail.compareExchangeABA(curr_tail, next_node);
+          }
+          else {
+            var ret_val = next_node.val;
+            if (_head.compareExchangeABA(curr_head, next_node)) {
+              retire_node(head_node);
+              return ret_val;
+            }
           }
         }
       }
