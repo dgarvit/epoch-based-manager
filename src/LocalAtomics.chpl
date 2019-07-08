@@ -220,6 +220,11 @@ module LocalAtomics {
     forwarding getObject();
   }
 
+  proc ==(const ref _arg1 : ABA, const ref _arg2 : ABA) {
+    if (_arg1._ABA_ptr.read() == _arg2._ABA_ptr.read() && _arg1._ABA_cnt.read() == _arg2._ABA_cnt.read()) then return true;
+    return false;
+  }
+
   /*
      Provides a software solution to the problem of applying atomic operations using
      128-bit wide pointers via compression. The algorithm used for compression (and
@@ -359,5 +364,19 @@ module LocalAtomics {
     writeln(atomicObj.exchange(nil));
     writeln(atomicObj.read());
     writeln(atomicObj.readABA());
+
+    writeln();
+
+    var a = atomicObj.readABA();
+    var b = atomicObj.readABA();
+
+    writeln(a==b);
+    atomicObj.compareExchangeABA(a, x);
+    writeln(a==b);
+
+    var c = atomicObj.readABA();
+
+    writeln(a==c);
+
   }
 }
