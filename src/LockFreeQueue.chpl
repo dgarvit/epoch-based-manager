@@ -71,16 +71,20 @@ module LockFreeQueue {
 
       // Now enqueue
       while (true) {
+        var tail = _tail.readABA();
+        var next = tail.next.readABA();
+        var next_node = next.getObject();
         var curr_tail = _tail.readABA();
-        var next = curr_tail.next.readABA();
-        if (next.getObject() == nil) {
-          if (curr_tail.next.compareExchangeABA(next, n)) {
-            _tail.compareExchangeABA(curr_tail, n);
-            break;
+        if (tail == curr_tail) {
+          if (next_node == nil) {
+            if (curr_tail.next.compareExchangeABA(next, n)) {
+              _tail.compareExchangeABA(curr_tail, n);
+              break;
+            }
           }
-        }
-        else {
-          _tail.compareExchangeABA(curr_tail, next.getObject());
+          else {
+            _tail.compareExchangeABA(curr_tail, next_node);
+          }
         }
       }
     }
