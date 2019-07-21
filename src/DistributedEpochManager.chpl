@@ -11,21 +11,24 @@ module DistributedEpochManager {
 
   class DistributedEpochManagerImpl {
     var pid : int;
-    var manager : unmanaged EpochManager();
+    var global_epoch : unmanaged GlobalEpoch;
+    // var manager : unmanaged EpochManager();
     proc init() {
-      manager = new unmanaged EpochManager();
+      // manager = new unmanaged EpochManager();
+      this.global_epoch = new unmanaged GlobalEpoch();
       this.complete();
       this.pid = _newPrivatizedClass(this);
     }
-    proc init(other, privatizedData) { 
-      manager = new unmanaged EpochManager();
+    proc init(other, privatizedData, global_epoch) {
+      // manager = new unmanaged EpochManager();
       this.complete();
+      this.global_epoch = global_epoch;
       this.pid = privatizedData;
     }
-    proc dsiPrivatize(privatizedData) { return new unmanaged DistributedEpochManagerImpl(this, pid); }
+    proc dsiPrivatize(privatizedData) { return new unmanaged DistributedEpochManagerImpl(this, pid, this.global_epoch); }
     proc dsiGetPrivatizeData() { return pid; }
-    inline proc getPrivatizedInstance() { return chpl_getPrivatizedCopy(this.type, pid); } // Bonus...
-    forwarding manager;
+    inline proc getPrivatizedInstance() { return chpl_getPrivatizedCopy(this.type, pid); }
+    // forwarding manager;
   }
 
   class C {
@@ -36,19 +39,24 @@ module DistributedEpochManager {
     }
   }
 
+  class GlobalEpoch {
+    var epoch : atomic int;
+
+    proc init() {
+      this.complete();
+      epoch.write(1);
+    }
+
+   forwarding epoch;
+  }
+
   var manager = new DistributedEpochManager();
   coforall loc in Locales do on loc {
-    // writeln(loc);
-    // writeln(manager.manager);
-    coforall i in 1..10 {
-      var tok = manager.register();
-      var b = new unmanaged C(i);
-      tok.pin();
-      tok.try_reclaim();
-      tok.delete_obj(b);
-      manager.unregister(tok);
-    }
-    manager.try_reclaim();
-    // delete manager;
+    writeln(manager.global_epoch.fetchAdd(1));
+  }
+
+  manager.global_epoch.write(99);
+  coforall loc in Locales do on loc {
+    writeln(manager.global_epoch);
   }
 }
