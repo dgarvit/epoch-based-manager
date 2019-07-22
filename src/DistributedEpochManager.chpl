@@ -60,6 +60,20 @@ module DistributedEpochManager {
       this.pid = privatizedData;
     }
 
+    proc register() : unmanaged _token { // Should be called only once
+      var tok = free_list.dequeue();
+      if (tok == nil) {
+        tok = new unmanaged _token(id_counter.fetchAdd(1), this:unmanaged);
+        allocated_list.append(tok);
+      }
+      return tok;
+    }
+
+    proc unregister(tok: unmanaged _token) {
+      tok.local_epoch.write(INACTIVE);
+      free_list.enqueue(tok);
+    }
+
     proc dsiPrivatize(privatizedData) {
       return new unmanaged DistributedEpochManagerImpl(this, pid, this.global_epoch);
     }
@@ -126,8 +140,12 @@ module DistributedEpochManager {
 
   var manager = new DistributedEpochManager();
   coforall loc in Locales do on loc {
-    writeln(manager.allocated_list);
-    writeln(manager.limbo_list);
+    coforall i in 0..here.id {
+      var tok = manager.register();
+      writeln(tok.id);
+      tok.unregister();
+    }
+    writeln(manager.free_list);
     writeln();
   }
 }
