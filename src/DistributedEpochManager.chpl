@@ -37,6 +37,7 @@ module DistributedEpochManager {
         allocated_list.append(tok);
         free_list.enqueue(tok);
       }
+      locale_epoch.write(global_epoch.read());
       id_counter.write(here.maxTaskPar:uint);
       forall i in 1..EBR_EPOCHS do
         limbo_list[i] = new unmanaged LimboList();
@@ -54,6 +55,7 @@ module DistributedEpochManager {
         allocated_list.append(tok);
         free_list.enqueue(tok);
       }
+      locale_epoch.write(global_epoch.read());
       id_counter.write(here.maxTaskPar:uint);
       forall i in 1..EBR_EPOCHS do
         limbo_list[i] = new unmanaged LimboList();
@@ -72,6 +74,17 @@ module DistributedEpochManager {
     proc unregister(tok: unmanaged _token) {
       tok.local_epoch.write(INACTIVE);
       free_list.enqueue(tok);
+    }
+
+    proc pin(tok: unmanaged _token) {
+      // An inactive task has local_epoch set to 0. A value other than 0
+      // implies active task
+      if (tok.local_epoch.read() == 0) then
+        tok.local_epoch.write(locale_epoch.read());
+    }
+
+    proc unpin(tok: unmanaged _token) {
+      tok.local_epoch.write(INACTIVE);
     }
 
     proc dsiPrivatize(privatizedData) {
@@ -140,12 +153,12 @@ module DistributedEpochManager {
 
   var manager = new DistributedEpochManager();
   coforall loc in Locales do on loc {
-    coforall i in 0..here.id {
+    /*coforall i in 0..here.id {
       var tok = manager.register();
       writeln(tok.id);
       tok.unregister();
-    }
-    writeln(manager.free_list);
+    }*/
+    writeln(manager.locale_epoch);
     writeln();
   }
 }
