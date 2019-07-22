@@ -18,6 +18,7 @@ module DistributedEpochManager {
     
     // Locale Epoch which operates on task local epochs on each locale
     var locale_epoch : atomic uint;
+    var active_tasks : atomic uint;
     var is_setting_locale_epoch : atomic bool;
     var allocated_list : unmanaged LockFreeLinkedList(unmanaged _token);
     var free_list : unmanaged LockFreeQueue(unmanaged _token);
@@ -72,19 +73,24 @@ module DistributedEpochManager {
     }
 
     proc unregister(tok: unmanaged _token) {
-      tok.local_epoch.write(INACTIVE);
+      unpin(tok);
       free_list.enqueue(tok);
     }
 
     proc pin(tok: unmanaged _token) {
       // An inactive task has local_epoch set to 0. A value other than 0
       // implies active task
-      if (tok.local_epoch.read() == 0) then
+      if (tok.local_epoch.read() == INACTIVE) {
+        active_tasks.add(1);
         tok.local_epoch.write(locale_epoch.read());
+      }
     }
 
     proc unpin(tok: unmanaged _token) {
-      tok.local_epoch.write(INACTIVE);
+      if (tok.local_epoch.read() != INACTIVE) {
+        active_tasks.sub(1);
+        tok.local_epoch.write(INACTIVE);
+      }
     }
 
     proc dsiPrivatize(privatizedData) {
