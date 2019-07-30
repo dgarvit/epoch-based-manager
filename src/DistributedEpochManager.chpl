@@ -19,7 +19,7 @@ module DistributedEpochManager {
     // Locale Epoch which operates on task local epochs on each locale
     var locale_epoch : atomic uint;
     var active_tasks : atomic uint;
-    var is_setting_locale_epoch : atomic bool;
+    var is_setting_epoch : atomic bool;
     var allocated_list : unmanaged LockFreeLinkedList(unmanaged _token);
     var free_list : unmanaged LockFreeQueue(unmanaged _token);
     var limbo_list : [1..EBR_EPOCHS] unmanaged LimboList();
@@ -84,6 +84,80 @@ module DistributedEpochManager {
         active_tasks.add(1);
         tok.local_epoch.write(locale_epoch.read());
       }
+    }
+
+    proc getMinimumEpoch() : uint {
+      if active_tasks.read() > 0 {
+        var minEpoch = max(uint);
+        for tok in allocated_list {
+          var local_epoch = tok.local_epoch.read();
+          if (local_epoch > 0) then
+            minEpoch = min(minEpoch, local_epoch);
+        }
+
+        if (minEpoch != max(uint)) then return minEpoch;
+      }
+
+      return 0;
+    }
+
+    proc delete_obj(tok : unmanaged _token, x : unmanaged object) {
+      var del_epoch = tok.local_epoch.read();
+      if (del_epoch == 0) {
+        writeln("Bad local epoch! Please pin! Using global epoch!");
+        del_epoch = global_epoch.read();
+      }
+      limbo_list[del_epoch].push(x); // How to make sure the object gets pushed to its local limbo list?
+    }
+
+    // Return epoch which is safe to be reclaimed. It is safe to
+    // reclaim from e-2 epoch
+    proc getReclaimEpoch() : uint {
+      const epoch = locale_epoch.read();
+      select epoch {
+        when 1 do return EBR_EPOCHS - 1;
+        when 2 do return EBR_EPOCHS;
+        otherwise do return epoch - 2;
+      }
+    }
+
+    // Try to announce a new epoch. If successful, reclaim objects which are
+    // safe to reclaim
+    proc try_reclaim() : uint {
+      if (is_setting_epoch.testAndSet()) then return;
+      if (global_epoch.is_setting_epoch.testAndSet()) then return;
+
+      var minEpoch = max(uint);
+      coforall loc in Locales with (min reduce minEpoch) do on loc {
+        var _this = getPrivatizedInstance();
+        var localeMinEpoch = _this.getMinimumEpoch();
+        if localeMinEpoch != 0 then
+          minEpoch = min(minEpoch, localeMinEpoch); // Is this safe? How about store all data in a data structure first?
+      }
+      const current_global_epoch = global_epoch.read();
+
+      if minEpoch == current_global_epoch || minEpoch == max(uint) {
+        const new_epoch = (current_global_epoch % EBR_EPOCHS) + 1;
+        global_epoch.write(new_epoch);
+        coforall loc in Locales do on loc {
+          var _this = getPrivatizedInstance();
+          _this.locale_epoch.write(new_epoch);
+
+          const reclaim_epoch = _this.getReclaimEpoch();
+          var reclaim_limbo_list = _this.limbo_list[reclaim_epoch];
+          var head = reclaim_limbo_list.pop();
+
+          while (head != nil) {
+            var next = head.next;
+            delete head.val;
+            // reclaim_limbo_list.retire_node(head);
+            delete head;
+            head = next;
+          }
+        }
+      }
+      global_epoch.is_setting_epoch.clear();
+      is_setting_epoch.clear();
     }
 
     proc unpin(tok: unmanaged _token) {
@@ -159,12 +233,15 @@ module DistributedEpochManager {
 
   var manager = new DistributedEpochManager();
   coforall loc in Locales do on loc {
-    /*coforall i in 0..here.id {
+    coforall i in 0..(here.id+1) {
       var tok = manager.register();
-      writeln(tok.id);
+      tok.pin();
+      var b = new unmanaged C(i);
+      tok.delete_obj(b);
       tok.unregister();
-    }*/
-    writeln(manager.locale_epoch);
-    writeln();
+    }
   }
+  manager.try_reclaim();
+  manager.try_reclaim();
+  manager.try_reclaim();
 }
