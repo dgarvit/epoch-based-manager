@@ -125,7 +125,10 @@ module DistributedEpochManager {
     // safe to reclaim
     proc try_reclaim() : uint {
       if (is_setting_epoch.testAndSet()) then return;
-      if (global_epoch.is_setting_epoch.testAndSet()) then return;
+      if (global_epoch.is_setting_epoch.testAndSet()) {
+        is_setting_epoch.clear();
+        return;
+      };
 
       var minEpoch = max(uint);
       coforall loc in Locales with (min reduce minEpoch) do on loc {
