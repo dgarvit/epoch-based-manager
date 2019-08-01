@@ -1,7 +1,9 @@
 module DistributedEpochManager {
-  
-  use EpochManager;
-  
+
+  use LockFreeLinkedList;
+  use LockFreeQueue;
+  use LimboList;
+
   pragma "always RVF"
   record DistributedEpochManager {
     var _pid : int;
@@ -234,17 +236,28 @@ module DistributedEpochManager {
     }
   }
 
+  config const OperationsPerThread = 1024 * 1024;
+
   var manager = new DistributedEpochManager();
   coforall loc in Locales do on loc {
-    coforall i in 0..(here.id+1) {
+    coforall tid in 1..here.maxTaskPar {
       var tok = manager.register();
-      tok.pin();
-      var b = new unmanaged C(i);
-      tok.delete_obj(b);
+      for i in 1..(OperationsPerThread*2) {
+        if i%2 == 0 {
+          var b = new unmanaged C(i);
+          tok.pin();
+          tok.delete_obj(b);
+          tok.unpin();
+        } else {
+          manager.try_reclaim();
+        }
+      }
       tok.unregister();
     }
   }
   manager.try_reclaim();
   manager.try_reclaim();
   manager.try_reclaim();
+
+  writeln("Done");
 }
