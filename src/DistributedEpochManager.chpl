@@ -72,18 +72,22 @@ module DistributedEpochManager {
       this.pid = privatizedData;
     }
 
-    proc register() : unmanaged _token { // Should be called only once
+    proc register() : owned TokenWrapper { // Should be called only once
       var tok = free_list.dequeue();
       if (tok == nil) {
         tok = new unmanaged _token(id_counter.fetchAdd(1), this:unmanaged);
         allocated_list.append(tok);
       }
-      return tok;
+      tok.is_registered.write(true);
+      return new owned TokenWrapper(tok);
     }
 
     proc unregister(tok: unmanaged _token) {
-      unpin(tok);
-      free_list.enqueue(tok);
+      if (tok.is_registered.read()) {
+        unpin(tok);
+        free_list.enqueue(tok);
+        tok.is_registered.write(false);
+      }
     }
 
     proc pin(tok: unmanaged _token) {
@@ -169,11 +173,8 @@ module DistributedEpochManager {
           }
           coforall loc in Locales do on loc {
             // Performs a bulk transfer
-            var ourObjs = objsToDelete[here.id];
-            if (ourObjs != nil) {
-              var ourObjs = objsToDelete[here.id].toArray();
-              delete ourObjs;
-            }
+            var ourObjs = objsToDelete[here.id].toArray();
+            delete ourObjs;
           }
           forall i in LocaleSpace do
             objsToDelete[i].clear();
@@ -218,6 +219,7 @@ module DistributedEpochManager {
   class _token {
     var local_epoch : atomic uint;
     const id : uint;
+    var is_registered : atomic bool;
     var manager : unmanaged DistributedEpochManagerImpl;
 
     proc init(x : uint, manager : unmanaged DistributedEpochManagerImpl) {
@@ -244,6 +246,20 @@ module DistributedEpochManager {
     proc unregister() {
       manager.unregister(this:unmanaged);
     }
+  }
+
+  class TokenWrapper {
+    var _tok : unmanaged _token;
+
+    proc init(_tok : unmanaged _token) {
+      this._tok = _tok;
+    }
+
+    proc deinit() {
+      _tok.unregister();
+    }
+
+    forwarding _tok;
   }
 
   class C {
