@@ -3,6 +3,7 @@ module DistributedEpochManager {
   use LockFreeLinkedList;
   use LockFreeQueue;
   use LimboList;
+  use Vector;
 
   pragma "always RVF"
   record DistributedEpochManager {
@@ -26,6 +27,7 @@ module DistributedEpochManager {
     var free_list : unmanaged LockFreeQueue(unmanaged _token);
     var limbo_list : [1..EBR_EPOCHS] unmanaged LimboList();
     var id_counter : atomic uint;
+    var objsToDelete : [LocaleSpace] unmanaged Vector(unmanaged object);
 
     proc init() {
       this.global_epoch = new unmanaged GlobalEpoch(1:uint);
@@ -44,6 +46,9 @@ module DistributedEpochManager {
       id_counter.write(here.maxTaskPar:uint);
       forall i in 1..EBR_EPOCHS do
         limbo_list[i] = new unmanaged LimboList();
+
+      forall i in LocaleSpace do
+        objsToDelete[i] = new unmanaged Vector(unmanaged object);
     }
 
     proc init(other, privatizedData, global_epoch) {
@@ -62,6 +67,8 @@ module DistributedEpochManager {
       id_counter.write(here.maxTaskPar:uint);
       forall i in 1..EBR_EPOCHS do
         limbo_list[i] = new unmanaged LimboList();
+      forall i in LocaleSpace do
+        objsToDelete[i] = new unmanaged Vector(unmanaged object);
       this.pid = privatizedData;
     }
 
@@ -109,7 +116,7 @@ module DistributedEpochManager {
         writeln("Bad local epoch! Please pin! Using global epoch!");
         del_epoch = global_epoch.read();
       }
-      limbo_list[del_epoch].push(x); // How to make sure the object gets pushed to its local limbo list?
+      limbo_list[del_epoch].push(x);
     }
 
     // Return epoch which is safe to be reclaimed. It is safe to
@@ -137,7 +144,7 @@ module DistributedEpochManager {
         var _this = getPrivatizedInstance();
         var localeMinEpoch = _this.getMinimumEpoch();
         if localeMinEpoch != 0 then
-          minEpoch = min(minEpoch, localeMinEpoch); // Is this safe? How about store all data in a data structure first?
+          minEpoch = min(minEpoch, localeMinEpoch);
       }
       const current_global_epoch = global_epoch.read();
 
@@ -152,13 +159,24 @@ module DistributedEpochManager {
           var reclaim_limbo_list = _this.limbo_list[reclaim_epoch];
           var head = reclaim_limbo_list.pop();
 
+          // Prepare work to be scattered by locale it is intended for.
           while (head != nil) {
+            var obj = head.val;
             var next = head.next;
-            delete head.val;
-            // reclaim_limbo_list.retire_node(head);
+            objsToDelete[obj.locale.id].append(obj);
             delete head;
             head = next;
           }
+          coforall loc in Locales do on loc {
+            // Performs a bulk transfer
+            var ourObjs = objsToDelete[here.id];
+            if (ourObjs != nil) {
+              var ourObjs = objsToDelete[here.id].toArray();
+              delete ourObjs;
+            }
+          }
+          forall i in LocaleSpace do
+            objsToDelete[i].clear();
         }
       }
       global_epoch.is_setting_epoch.clear();
@@ -236,28 +254,27 @@ module DistributedEpochManager {
     }
   }
 
+  use Time;
+
   config const OperationsPerThread = 1024 * 1024;
 
+  var timer = new Timer();
+  timer.start();
   var manager = new DistributedEpochManager();
   coforall loc in Locales do on loc {
     coforall tid in 1..here.maxTaskPar {
       var tok = manager.register();
-      for i in 1..(OperationsPerThread*2) {
-        if i%2 == 0 {
-          var b = new unmanaged C(i);
-          tok.pin();
-          tok.delete_obj(b);
-          tok.unpin();
-        } else {
-          manager.try_reclaim();
-        }
+      for i in 1..OperationsPerThread {
+        tok.pin();
+        tok.delete_obj(new unmanaged C(i));
+        tok.unpin();
       }
       tok.unregister();
+      manager.try_reclaim();
     }
   }
   manager.try_reclaim();
-  manager.try_reclaim();
-  manager.try_reclaim();
-
-  writeln("Done");
+  timer.stop();
+  writeln("Time: ", timer.elapsed());
+  timer.clear();
 }
