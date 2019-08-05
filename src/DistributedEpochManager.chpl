@@ -7,8 +7,17 @@ module DistributedEpochManager {
 
   pragma "always RVF"
   record DistributedEpochManager {
-    var _pid : int;
-    proc init() { this._pid = (new unmanaged DistributedEpochManagerImpl()).pid; }
+    var _pid : int = -1;
+    proc init() { 
+      this._pid = (new unmanaged DistributedEpochManagerImpl()).pid; 
+    }
+    
+    proc destroy() {
+      coforall loc in Locales do on loc {
+        delete chpl_getPrivatizedCopy(unmanaged DistributedEpochManagerImpl, _pid);
+      }
+    }
+
     forwarding chpl_getPrivatizedCopy(unmanaged DistributedEpochManagerImpl, _pid);
   }
 
@@ -72,13 +81,26 @@ module DistributedEpochManager {
       this.pid = privatizedData;
     }
 
+    proc deinit() {
+      // Delete locale-private data
+      delete limbo_list;
+      delete free_list;
+      delete allocated_list;
+      delete objsToDelete;
+
+      // Delete global data
+      if here == Locales[0] {
+        delete global_epoch;
+      }
+    }
+
     proc register() : owned TokenWrapper { // owned TokenWrapper { // Should be called only once
       var tok = free_list.dequeue();
       if (tok == nil) {
         tok = new unmanaged _token(id_counter.fetchAdd(1), this:unmanaged);
         allocated_list.append(tok);
       }
-      tok.is_registered.write(true);
+      tok.is_registered.write(true); 
       // return tok;
       return new owned TokenWrapper(tok, this:unmanaged);
     }
@@ -192,6 +214,39 @@ module DistributedEpochManager {
       }
     }
 
+    // Destroy all objects. Not thread-safe.
+    proc clear() {
+      coforall loc in Locales do on loc {
+        var _this = getPrivatizedInstance();
+        
+        // Reset epoch
+        if here == global_epoch.locale {
+          global_epoch.write(1);
+        }
+        locale_epoch.write(1);
+        
+        for limbo in limbo_list {
+          var head = limbo.pop();
+
+          // Prepare work to be scattered by locale it is intended for.
+          while (head != nil) {
+            var obj = head.val;
+            var next = head.next;
+            _this.objsToDelete[obj.locale.id].append(obj);
+            delete head;
+            head = next;
+          }
+        }
+        coforall loc in Locales do on loc {
+          // Bulk transfer
+          var ourObjs = _this.objsToDelete[here.id].getArray();
+          delete ourObjs;
+        }
+        forall i in LocaleSpace do
+          _this.objsToDelete[i].clear();
+      }
+    }
+
     proc dsiPrivatize(privatizedData) {
       return new unmanaged DistributedEpochManagerImpl(this, pid, this.global_epoch);
     }
@@ -202,10 +257,6 @@ module DistributedEpochManager {
     
     inline proc getPrivatizedInstance() {
       return chpl_getPrivatizedCopy(this.type, pid);
-    }
-
-    proc deinit() {
-      // Yet to implement
     }
   }
 
@@ -287,64 +338,27 @@ module DistributedEpochManager {
     }
   }
 
-  class C {
-    var x : int;
-
-    proc deinit() {
-      writeln(x:string + " reclaimed.");
-    }
-  }
-
   use Time;
-
-/*
-  config const OperationsPerThread = 10;
-  var timer = new Timer();
-  timer.start();
-  var manager = new DistributedEpochManager();
-  coforall loc in Locales do on loc {
-    coforall tid in 1..here.maxTaskPar {
-      var tok = manager.register();
-      for i in 1..OperationsPerThread {
-        tok.pin();
-        tok.delete_obj(new unmanaged C(i));
-        tok.unpin();
-      }
-      tok.unregister();
-      manager.try_reclaim();
-    }
-  }
-  manager.try_reclaim();
-  timer.stop();
-  writeln("Time: ", timer.elapsed());
-  timer.clear();*/
 
   config const numObjects = 2;
   var objsDom = {0..#numObjects} dmapped Cyclic(startIdx=0);
-  var objs : [objsDom] unmanaged C();
+  var objs : [objsDom] unmanaged object();
   var manager = new DistributedEpochManager();
   forall obj in objs with (var rng = new RandomStream(int)) {
-    on Locales[abs(rng.getNext()) % numLocales] do obj = new unmanaged C(here.id);
+    on Locales[abs(rng.getNext()) % numLocales] do obj = new unmanaged object();
   }
 // start timer...
   var timer = new Timer();
   timer.start();
-  // for obj in objs {
   forall obj in objs with (var tok = manager.register()) {
-    // var tok = manager.register();
-    // writeln(obj:string + " " + obj.locale.id:string);
     tok.pin();
     tok.delete_obj(obj);
     tok.unpin();
-    // tok.unregister();
-    manager.try_reclaim();
   }
-  // end timer...
-  // print timing...
-  manager.try_reclaim();
-  manager.try_reclaim();
-  manager.try_reclaim();
+  writeln("Done delete_obj");
+  manager.clear();
   timer.stop();
   writeln("Time: ", timer.elapsed());
   timer.clear();
+  manager.destroy();
 }

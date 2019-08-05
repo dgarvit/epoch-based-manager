@@ -42,8 +42,11 @@ module LockFreeLinkedList {
     }
 
     proc deinit() {
-      for x in this {
-        delete x;
+      var ptr = _head.read();
+      while (ptr != nil) {
+        var next = ptr.next;
+        delete ptr;
+        ptr = next;
       }
     }
   }
