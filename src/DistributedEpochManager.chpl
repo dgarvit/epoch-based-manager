@@ -203,6 +203,10 @@ module DistributedEpochManager {
     inline proc getPrivatizedInstance() {
       return chpl_getPrivatizedCopy(this.type, pid);
     }
+
+    proc deinit() {
+      // Yet to implement
+    }
   }
 
   class GlobalEpoch {
@@ -273,8 +277,8 @@ module DistributedEpochManager {
 
   use Time;
 
+/*
   config const OperationsPerThread = 10;
-
   var timer = new Timer();
   timer.start();
   var manager = new DistributedEpochManager();
@@ -290,6 +294,35 @@ module DistributedEpochManager {
       manager.try_reclaim();
     }
   }
+  manager.try_reclaim();
+  timer.stop();
+  writeln("Time: ", timer.elapsed());
+  timer.clear();*/
+
+  config const numObjects = 10;
+  var objsDom = {0..#numObjects} dmapped Cyclic(startIdx=0);
+  var objs : [objsDom] unmanaged C();
+  var manager = new DistributedEpochManager();
+  forall obj in objs with (var rng = new RandomStream(int)) {
+    on Locales[abs(rng.getNext()) % numLocales] do obj = new unmanaged C(here.id);
+  }
+// start timer...
+  var timer = new Timer();
+  timer.start();
+  for obj in objs {
+  // forall obj in objs with (var tok = manager.register()) {
+    var tok = manager.register();
+    writeln(obj:string + " " + obj.locale.id:string);
+    tok.pin();
+    tok.delete_obj(obj);
+    tok.unpin();
+    // tok.unregister();
+    manager.try_reclaim();
+  }
+  // end timer...
+  // print timing...
+  manager.try_reclaim();
+  manager.try_reclaim();
   manager.try_reclaim();
   timer.stop();
   writeln("Time: ", timer.elapsed());
