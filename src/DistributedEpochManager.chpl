@@ -72,15 +72,15 @@ module DistributedEpochManager {
       this.pid = privatizedData;
     }
 
-    proc register() : unmanaged _token { // owned TokenWrapper { // Should be called only once
+    proc register() : owned TokenWrapper { // owned TokenWrapper { // Should be called only once
       var tok = free_list.dequeue();
       if (tok == nil) {
         tok = new unmanaged _token(id_counter.fetchAdd(1), this:unmanaged);
         allocated_list.append(tok);
       }
       tok.is_registered.write(true);
-      return tok;
-      // return new owned TokenWrapper(tok);
+      // return tok;
+      return new owned TokenWrapper(tok, this:unmanaged);
     }
 
     proc unregister(tok: unmanaged _token) {
@@ -255,16 +255,36 @@ module DistributedEpochManager {
 
   class TokenWrapper {
     var _tok : unmanaged _token;
+    var manager : unmanaged DistributedEpochManagerImpl;
 
-    proc init(_tok : unmanaged _token) {
+    proc init(_tok : unmanaged _token, manager : unmanaged DistributedEpochManagerImpl) {
       this._tok = _tok;
+      this.manager = manager;
+    }
+
+    proc pin() {
+      manager.pin(this._tok);
+    }
+
+    proc unpin() {
+      manager.unpin(this._tok);
+    }
+
+    proc delete_obj(x) {
+      manager.delete_obj(this._tok, x);
+    }
+
+    proc try_reclaim() {
+      manager.try_reclaim();
+    }
+
+    proc unregister() {
+      manager.unregister(this._tok);
     }
 
     proc deinit() {
-      _tok.unregister();
+      manager.unregister(this._tok);
     }
-
-    forwarding _tok;
   }
 
   class C {
@@ -299,7 +319,7 @@ module DistributedEpochManager {
   writeln("Time: ", timer.elapsed());
   timer.clear();*/
 
-  config const numObjects = 10;
+  config const numObjects = 2;
   var objsDom = {0..#numObjects} dmapped Cyclic(startIdx=0);
   var objs : [objsDom] unmanaged C();
   var manager = new DistributedEpochManager();
@@ -309,10 +329,10 @@ module DistributedEpochManager {
 // start timer...
   var timer = new Timer();
   timer.start();
-  for obj in objs {
-  // forall obj in objs with (var tok = manager.register()) {
-    var tok = manager.register();
-    writeln(obj:string + " " + obj.locale.id:string);
+  // for obj in objs {
+  forall obj in objs with (var tok = manager.register()) {
+    // var tok = manager.register();
+    // writeln(obj:string + " " + obj.locale.id:string);
     tok.pin();
     tok.delete_obj(obj);
     tok.unpin();
