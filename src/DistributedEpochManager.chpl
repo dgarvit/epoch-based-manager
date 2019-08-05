@@ -72,14 +72,15 @@ module DistributedEpochManager {
       this.pid = privatizedData;
     }
 
-    proc register() : owned TokenWrapper { // Should be called only once
+    proc register() : unmanaged _token { // owned TokenWrapper { // Should be called only once
       var tok = free_list.dequeue();
       if (tok == nil) {
         tok = new unmanaged _token(id_counter.fetchAdd(1), this:unmanaged);
         allocated_list.append(tok);
       }
       tok.is_registered.write(true);
-      return new owned TokenWrapper(tok);
+      return tok;
+      // return new owned TokenWrapper(tok);
     }
 
     proc unregister(tok: unmanaged _token) {
@@ -173,7 +174,7 @@ module DistributedEpochManager {
           }
           coforall loc in Locales do on loc {
             // Performs a bulk transfer
-            var ourObjs = objsToDelete[here.id].toArray();
+            var ourObjs = objsToDelete[here.id].getArray();
             delete ourObjs;
           }
           forall i in LocaleSpace do
@@ -272,7 +273,7 @@ module DistributedEpochManager {
 
   use Time;
 
-  config const OperationsPerThread = 1024 * 1024;
+  config const OperationsPerThread = 10;
 
   var timer = new Timer();
   timer.start();

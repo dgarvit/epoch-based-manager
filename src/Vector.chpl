@@ -106,6 +106,12 @@ class Vector {
     return arr[0..#sz];
   }
 
+  proc getArray() {
+   var dom = {0..#sz};
+   var arr : [dom] eltType = this.arr[0..#sz];
+   return arr;
+  }
+
   proc readWriteThis(f) {
     f <~> "(Vector) {" <~> this.toArray() <~> "}";
   }
