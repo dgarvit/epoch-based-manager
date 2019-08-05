@@ -168,17 +168,17 @@ module DistributedEpochManager {
           while (head != nil) {
             var obj = head.val;
             var next = head.next;
-            objsToDelete[obj.locale.id].append(obj);
+            _this.objsToDelete[obj.locale.id].append(obj);
             delete head;
             head = next;
           }
           coforall loc in Locales do on loc {
             // Performs a bulk transfer
-            var ourObjs = objsToDelete[here.id].getArray();
+            var ourObjs = _this.objsToDelete[here.id].getArray();
             delete ourObjs;
           }
           forall i in LocaleSpace do
-            objsToDelete[i].clear();
+            _this.objsToDelete[i].clear();
         }
       }
       global_epoch.is_setting_epoch.clear();
