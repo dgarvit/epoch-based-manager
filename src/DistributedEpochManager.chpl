@@ -153,7 +153,7 @@ module DistributedEpochManager {
     pragma "no doc"
     var is_setting_epoch : atomic bool;
 
-    //  List of active tokens on current locale
+    //  List of all tokens on current locale
     pragma "no doc"
     var allocated_list : unmanaged LockFreeLinkedList(unmanaged _token);
 
