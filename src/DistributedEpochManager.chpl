@@ -8,10 +8,10 @@ module DistributedEpochManager {
   pragma "always RVF"
   record DistributedEpochManager {
     var _pid : int = -1;
-    proc init() { 
-      this._pid = (new unmanaged DistributedEpochManagerImpl()).pid; 
+    proc init() {
+      this._pid = (new unmanaged DistributedEpochManagerImpl()).pid;
     }
-    
+
     proc destroy() {
       coforall loc in Locales do on loc {
         delete chpl_getPrivatizedCopy(unmanaged DistributedEpochManagerImpl, _pid);
@@ -89,7 +89,7 @@ module DistributedEpochManager {
       delete objsToDelete;
 
       // Delete global data
-      if here == Locales[0] {
+      if here == Locales[0] { // Is it necessary that global_epoch be on Locales[0]?
         delete global_epoch;
       }
     }
@@ -100,7 +100,7 @@ module DistributedEpochManager {
         tok = new unmanaged _token(id_counter.fetchAdd(1), this:unmanaged);
         allocated_list.append(tok);
       }
-      tok.is_registered.write(true); 
+      tok.is_registered.write(true);
       // return tok;
       return new owned TokenWrapper(tok, this:unmanaged);
     }
@@ -218,13 +218,13 @@ module DistributedEpochManager {
     proc clear() {
       coforall loc in Locales do on loc {
         var _this = getPrivatizedInstance();
-        
+
         // Reset epoch
         if here == global_epoch.locale {
           global_epoch.write(1);
         }
         locale_epoch.write(1);
-        
+
         for limbo in limbo_list {
           var head = limbo.pop();
 
