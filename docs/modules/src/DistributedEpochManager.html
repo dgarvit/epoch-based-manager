@@ -1,0 +1,578 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>DistributedEpochManager &mdash; chpldoc 0.0.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="chpldoc 0.0.1 documentation" href="../../index.html"/>
+        <link rel="prev" title="chpldoc documentation" href="../../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> chpldoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">chpldoc documentation</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="">DistributedEpochManager</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#usage">Usage</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">chpldoc</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+    <li>DistributedEpochManager</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/modules/src/DistributedEpochManager.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <span class="target" id="module-DistributedEpochManager"></span><div class="section" id="distributedepochmanager">
+<h1>DistributedEpochManager<a class="headerlink" href="#distributedepochmanager" title="Permalink to this headline">¶</a></h1>
+<p><strong>Usage</strong></p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="k">use</span> <span class="nx">DistributedEpochManager</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="section" id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
+<p>To use the <cite>Distributed Epoch Manager</cite>, first create an instance.</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">manager</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">DistributedEpochManager</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>To use the manager, a task must be registered with the manager. Registration
+returns a token.</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">tok</span> <span class="o">=</span> <span class="nx">manager</span><span class="p">.</span><span class="nx">register</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>To avoid reclamation while a task is accessing a resource, I.E. to enter
+critical section, a task must <cite>pin</cite>. Correspondingly to exit critical section,
+the task must <cite>unpin</cite>.</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="c1">// Enter critical section</span>
+<span class="nx">tok</span><span class="p">.</span><span class="nx">pin</span><span class="p">();</span>
+<span class="c1">// Do something</span>
+
+<span class="c1">// Exit critical section</span>
+<span class="nx">tok</span><span class="p">.</span><span class="nx">unpin</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>To <cite>delete</cite> an object:</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">delete_obj</span><span class="p">(</span><span class="nx">myObj</span><span class="p">);</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">A task must be <cite>pinned</cite> to <cite>delete</cite> an object. The manager can only be used to
+delete <code class="docutils literal"><span class="pre">unmanaged</span></code> objects.</p>
+</div>
+<p>To try to reclaim memory:</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">try_reclaim</span><span class="p">();</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Alternatively, a task may call <code class="docutils literal"><span class="pre">manager.try_reclaim()</span></code>.</p>
+</div>
+<p>In the end, a registered task needs to <cite>unregister</cite> from the manager. The
+registration token is a scoped variable, and hence the ending of the scope in
+which the task registered would automatically <cite>unregister</cite> the task.
+<cite>unregister</cite> can also be performed manually:</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">unregister</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>To destroy the manager, and reclaim all the memory managed by the manager:</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">manager</span><span class="p">.</span><span class="nx">destroy</span><span class="p">();</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This function is not thread-safe.</p>
+</div>
+<dl class="record">
+<dt id="DistributedEpochManager.DistributedEpochManager">
+<em class="property">record </em><code class="descname">DistributedEpochManager</code><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManager" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="attribute">
+<dt id="DistributedEpochManager.DistributedEpochManager._pid">
+<em class="property">var </em><code class="descname">_pid</code>: int = -1<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManager._pid" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManager.init">
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManager.init" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManager.destroy">
+<em class="property">proc </em><code class="descname">destroy</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManager.destroy" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl">
+<em class="property">class </em><code class="descname">DistributedEpochManagerImpl</code><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="attribute">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.pid">
+<em class="property">var </em><code class="descname">pid</code>: int<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.pid" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.EBR_EPOCHS">
+<em class="property">const </em><code class="descname">EBR_EPOCHS</code>: uint = 3<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.EBR_EPOCHS" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.INACTIVE">
+<em class="property">const </em><code class="descname">INACTIVE</code>: uint = 0<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.INACTIVE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.global_epoch">
+<em class="property">var </em><code class="descname">global_epoch</code>: unmanaged GlobalEpoch<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.global_epoch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.locale_epoch">
+<em class="property">var </em><code class="descname">locale_epoch</code>: atomicuint<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.locale_epoch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.active_tasks">
+<em class="property">var </em><code class="descname">active_tasks</code>: atomicuint<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.active_tasks" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.is_setting_epoch">
+<em class="property">var </em><code class="descname">is_setting_epoch</code>: atomicbool<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.is_setting_epoch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.allocated_list">
+<em class="property">var </em><code class="descname">allocated_list</code>: unmanaged LockFreeLinkedList(unmanaged _token)<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.allocated_list" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.free_list">
+<em class="property">var </em><code class="descname">free_list</code>: unmanaged LockFreeQueue(unmanaged _token)<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.free_list" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.limbo_list">
+<em class="property">var </em><code class="descname">limbo_list</code>: [1..EBR_EPOCHS] unmanaged LimboList()<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.limbo_list" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.id_counter">
+<em class="property">var </em><code class="descname">id_counter</code>: atomicuint<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.id_counter" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.objsToDelete">
+<em class="property">var </em><code class="descname">objsToDelete</code>: [LocaleSpace] unmanaged Vector(unmanaged object)<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.objsToDelete" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.init">
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.init" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt>
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>other</em>, <em>privatizedData</em>, <em>global_epoch</em><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.deinit">
+<em class="property">proc </em><code class="descname">deinit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.deinit" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.register">
+<em class="property">proc </em><code class="descname">register</code><span class="sig-paren">(</span><span class="sig-paren">)</span>: owned TokenWrapper<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.register" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.unregister">
+<em class="property">proc </em><code class="descname">unregister</code><span class="sig-paren">(</span><em>tok: unmanaged _token</em><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.unregister" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.pin">
+<em class="property">proc </em><code class="descname">pin</code><span class="sig-paren">(</span><em>tok: unmanaged _token</em><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.pin" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.getMinimumEpoch">
+<em class="property">proc </em><code class="descname">getMinimumEpoch</code><span class="sig-paren">(</span><span class="sig-paren">)</span>: uint<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.getMinimumEpoch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.delete_obj">
+<em class="property">proc </em><code class="descname">delete_obj</code><span class="sig-paren">(</span><em>tok: unmanaged _token</em>, <em>x: unmanaged object</em><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.delete_obj" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.getReclaimEpoch">
+<em class="property">proc </em><code class="descname">getReclaimEpoch</code><span class="sig-paren">(</span><span class="sig-paren">)</span>: uint<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.getReclaimEpoch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.try_reclaim">
+<em class="property">proc </em><code class="descname">try_reclaim</code><span class="sig-paren">(</span><span class="sig-paren">)</span>: uint<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.try_reclaim" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.unpin">
+<em class="property">proc </em><code class="descname">unpin</code><span class="sig-paren">(</span><em>tok: unmanaged _token</em><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.unpin" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.clear">
+<em class="property">proc </em><code class="descname">clear</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.clear" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.dsiPrivatize">
+<em class="property">proc </em><code class="descname">dsiPrivatize</code><span class="sig-paren">(</span><em>privatizedData</em><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.dsiPrivatize" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.dsiGetPrivatizeData">
+<em class="property">proc </em><code class="descname">dsiGetPrivatizeData</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.dsiGetPrivatizeData" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.DistributedEpochManagerImpl.getPrivatizedInstance">
+<em class="property">proc </em><code class="descname">getPrivatizedInstance</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.getPrivatizedInstance" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="DistributedEpochManager.GlobalEpoch">
+<em class="property">class </em><code class="descname">GlobalEpoch</code><a class="headerlink" href="#DistributedEpochManager.GlobalEpoch" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="attribute">
+<dt id="DistributedEpochManager.GlobalEpoch.epoch">
+<em class="property">var </em><code class="descname">epoch</code>: atomicuint<a class="headerlink" href="#DistributedEpochManager.GlobalEpoch.epoch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager.GlobalEpoch.is_setting_epoch">
+<em class="property">var </em><code class="descname">is_setting_epoch</code>: atomicbool<a class="headerlink" href="#DistributedEpochManager.GlobalEpoch.is_setting_epoch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.GlobalEpoch.init">
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>x: uint</em><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.GlobalEpoch.init" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="DistributedEpochManager._token">
+<em class="property">class </em><code class="descname">_token</code><a class="headerlink" href="#DistributedEpochManager._token" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="attribute">
+<dt id="DistributedEpochManager._token.local_epoch">
+<em class="property">var </em><code class="descname">local_epoch</code>: atomicuint<a class="headerlink" href="#DistributedEpochManager._token.local_epoch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager._token.id">
+<em class="property">const </em><code class="descname">id</code>: uint<a class="headerlink" href="#DistributedEpochManager._token.id" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager._token.is_registered">
+<em class="property">var </em><code class="descname">is_registered</code>: atomicbool<a class="headerlink" href="#DistributedEpochManager._token.is_registered" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager._token.manager">
+<em class="property">var </em><code class="descname">manager</code>: unmanaged DistributedEpochManagerImpl<a class="headerlink" href="#DistributedEpochManager._token.manager" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager._token.init">
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>x: uint</em>, <em>manager: unmanaged DistributedEpochManagerImpl</em><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager._token.init" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager._token.pin">
+<em class="property">proc </em><code class="descname">pin</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager._token.pin" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager._token.unpin">
+<em class="property">proc </em><code class="descname">unpin</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager._token.unpin" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager._token.delete_obj">
+<em class="property">proc </em><code class="descname">delete_obj</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager._token.delete_obj" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager._token.try_reclaim">
+<em class="property">proc </em><code class="descname">try_reclaim</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager._token.try_reclaim" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager._token.unregister">
+<em class="property">proc </em><code class="descname">unregister</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager._token.unregister" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="DistributedEpochManager.TokenWrapper">
+<em class="property">class </em><code class="descname">TokenWrapper</code><a class="headerlink" href="#DistributedEpochManager.TokenWrapper" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="attribute">
+<dt id="DistributedEpochManager.TokenWrapper._tok">
+<em class="property">var </em><code class="descname">_tok</code>: unmanaged _token<a class="headerlink" href="#DistributedEpochManager.TokenWrapper._tok" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="DistributedEpochManager.TokenWrapper.manager">
+<em class="property">var </em><code class="descname">manager</code>: unmanaged DistributedEpochManagerImpl<a class="headerlink" href="#DistributedEpochManager.TokenWrapper.manager" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.TokenWrapper.init">
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>_tok: unmanaged _token</em>, <em>manager: unmanaged DistributedEpochManagerImpl</em><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.TokenWrapper.init" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.TokenWrapper.pin">
+<em class="property">proc </em><code class="descname">pin</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.TokenWrapper.pin" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.TokenWrapper.unpin">
+<em class="property">proc </em><code class="descname">unpin</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.TokenWrapper.unpin" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.TokenWrapper.delete_obj">
+<em class="property">proc </em><code class="descname">delete_obj</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.TokenWrapper.delete_obj" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.TokenWrapper.try_reclaim">
+<em class="property">proc </em><code class="descname">try_reclaim</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.TokenWrapper.try_reclaim" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.TokenWrapper.unregister">
+<em class="property">proc </em><code class="descname">unregister</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.TokenWrapper.unregister" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="DistributedEpochManager.TokenWrapper.deinit">
+<em class="property">proc </em><code class="descname">deinit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.TokenWrapper.deinit" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="data">
+<dt id="DistributedEpochManager.numObjects">
+<em class="property">config const </em><code class="descname">numObjects</code> = 2<a class="headerlink" href="#DistributedEpochManager.numObjects" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="data">
+<dt id="DistributedEpochManager.objsDom">
+<em class="property">var </em><code class="descname">objsDom</code> = {0..#numObjects} dmapped Cyclic(startIdx = 0)<a class="headerlink" href="#DistributedEpochManager.objsDom" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="data">
+<dt id="DistributedEpochManager.objs">
+<em class="property">var </em><code class="descname">objs</code>: [objsDom] unmanaged object()<a class="headerlink" href="#DistributedEpochManager.objs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="data">
+<dt id="DistributedEpochManager.manager">
+<em class="property">var </em><code class="descname">manager</code> = new DistributedEpochManager()<a class="headerlink" href="#DistributedEpochManager.manager" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="data">
+<dt id="DistributedEpochManager.timer">
+<em class="property">var </em><code class="descname">timer</code> = new Timer()<a class="headerlink" href="#DistributedEpochManager.timer" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="../../index.html" class="btn btn-neutral" title="chpldoc documentation" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, .
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+  
+ 
+
+
+
+</body>
+</html>

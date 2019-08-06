@@ -1,3 +1,79 @@
+/*
+Usage
+-----
+
+To use the `Distributed Epoch Manager`, first create an instance.
+
+.. code-block:: chapel
+
+ var manager = new DistributedEpochManager();
+
+
+To use the manager, a task must be registered with the manager. Registration
+returns a token.
+
+.. code-block:: chapel
+
+ var tok = manager.register();
+
+
+To avoid reclamation while a task is accessing a resource, I.E. to enter
+critical section, a task must `pin`. Correspondingly to exit critical section,
+the task must `unpin`.
+
+.. code-block:: chapel
+
+ // Enter critical section
+ tok.pin();
+ // Do something
+
+ // Exit critical section
+ tok.unpin();
+
+
+To `delete` an object:
+
+.. code-block:: chapel
+
+ tok.delete_obj(myObj);
+
+
+.. note::
+ A task must be `pinned` to `delete` an object. The manager can only be used to
+ delete ``unmanaged`` objects.
+
+
+To try to reclaim memory:
+
+.. code-block:: chapel
+
+ tok.try_reclaim();
+
+
+.. note::
+ Alternatively, a task may call ``manager.try_reclaim()``.
+
+
+In the end, a registered task needs to `unregister` from the manager. The
+registration token is a scoped variable, and hence the ending of the scope in
+which the task registered would automatically `unregister` the task.
+`unregister` can also be performed manually:
+
+.. code-block:: chapel
+
+ tok.unregister();
+
+
+To destroy the manager, and reclaim all the memory managed by the manager:
+
+.. code-block:: chapel
+
+ manager.destroy();
+
+
+.. note::
+ This function is not thread-safe.
+*/
 module DistributedEpochManager {
 
   use LockFreeLinkedList;
