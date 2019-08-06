@@ -20,6 +20,8 @@ To use the :class:`EpochManager`, first create an instance.
  var manager = new unmanaged EpochManager();
 
 
+Registering a Task
+------------------
 A task must be registered with the manager in order to use the manager.
 Registration returns a token.
 
@@ -28,6 +30,8 @@ Registration returns a token.
  var tok = manager.register();
 
 
+Pinning/Unpinning a Task
+------------------------
 To avoid reclamation while a task is accessing a resource, I.E. to enter
 critical section, a task must `pin`. Correspondingly to exit critical section,
 the task must `unpin`.
@@ -42,6 +46,8 @@ the task must `unpin`.
  tok.unpin();
 
 
+Deleting an object
+------------------
 To `delete` an object:
 
 .. code-block:: chapel
@@ -54,6 +60,8 @@ To `delete` an object:
  delete ``unmanaged`` objects.
 
 
+Reclaiming deleted objects
+--------------------------
 To try to reclaim memory:
 
 .. code-block:: chapel
@@ -65,6 +73,8 @@ To try to reclaim memory:
  Alternatively, a task may call ``manager.try_reclaim()``.
 
 
+Unregister a Task
+-----------------
 In the end, a registered task needs to `unregister` from the manager. The
 registration token is a scoped variable, and hence the ending of the scope in
 which the task registered would automatically `unregister` the task.
@@ -74,7 +84,8 @@ which the task registered would automatically `unregister` the task.
 
  tok.unregister();
 
-
+Destroy
+-------
 To destroy the manager, and reclaim all the memory managed by the manager:
 
 .. code-block:: chapel
@@ -83,39 +94,38 @@ To destroy the manager, and reclaim all the memory managed by the manager:
 
 .. class:: EpochManager
 
-   .. attribute:: const EBR_EPOCHS: uint = 3
+   
+   :class:`EpochManager` manages reclamation of objects, ensuring
+   thread-safety.
+   
 
-   .. attribute:: const INACTIVE: uint = 0
-
-   .. attribute:: var global_epoch: atomicuint
-
-   .. attribute:: var is_setting_epoch: atomicbool
-
-   .. attribute:: var allocated_list: unmanaged LockFreeLinkedList(unmanaged _token)
-
-   .. attribute:: var free_list: unmanaged LockFreeQueue(unmanaged _token)
-
-   .. attribute:: var limbo_list: [1..EBR_EPOCHS] unmanaged LimboList()
-
-   .. attribute:: var id_counter: atomicuint
 
    .. method:: proc init()
 
+      
+      Default initialize the manager.
+      
+
    .. method:: proc register(): owned TokenWrapper
 
-   .. method:: proc unregister(tok: unmanaged _token)
-
-   .. method:: proc pin(tok: unmanaged _token)
-
-   .. method:: proc unpin(tok: unmanaged _token)
-
-   .. method:: proc try_advance(): uint
-
-   .. method:: proc delete_obj(tok: unmanaged _token, x: unmanaged object)
+      
+      Register a task.
+      
+      :returns: A handle to the manager
+      
 
    .. method:: proc try_reclaim()
 
+      
+      Try to announce a new epoch. If successful, reclaim objects which are
+      safe to reclaim
+      
+
    .. method:: proc deinit()
+
+      
+      Reclaim all objects
+      
 
 .. class:: TokenWrapper
 

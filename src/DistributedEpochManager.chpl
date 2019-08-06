@@ -9,7 +9,6 @@ To use the :record:`DistributedEpochManager`, first create an instance.
 
 Registering a Task
 ------------------
-
 A task must be registered with the manager in order to use the manager.
 Registration returns a token.
 
