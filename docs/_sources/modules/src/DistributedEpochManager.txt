@@ -1,7 +1,7 @@
 .. default-domain:: chpl
 
 .. module:: DistributedEpochManager
-   :synopsis: Usage
+   :synopsis: To use the :record:`DistributedEpochManager`, first create an instance.
 
 DistributedEpochManager
 =======================
@@ -12,18 +12,16 @@ DistributedEpochManager
    use DistributedEpochManager;
 
 
-Usage
------
 
-To use the `Distributed Epoch Manager`, first create an instance.
+To use the :record:`DistributedEpochManager`, first create an instance.
 
 .. code-block:: chapel
 
  var manager = new DistributedEpochManager();
 
 
-To use the manager, a task must be registered with the manager. Registration
-returns a token.
+A task must be registered with the manager in order to use the manager.
+Registration returns a token.
 
 .. code-block:: chapel
 
@@ -89,125 +87,102 @@ To destroy the manager, and reclaim all the memory managed by the manager:
 
 .. record:: DistributedEpochManager
 
-   .. attribute:: var _pid: int = -1
+   
+   :record:`DistributedEpochManager` manages reclamation of objects, ensuring
+   thread-safety. It employs privatization.
+   
+
 
    .. method:: proc init()
+
+      
+      Default initialize with object of privatized class.
+      
 
    .. method:: proc destroy()
 
+      
+      Reclaim all allocated memory; destroy all privatized objects.
+      
+
 .. class:: DistributedEpochManagerImpl
 
-   .. attribute:: var pid: int
+   
+   The class which is privatized on each locale for
+   :record:`DistributedEpochManager`.
+   
+
 
    .. attribute:: const EBR_EPOCHS: uint = 3
 
-   .. attribute:: const INACTIVE: uint = 0
-
-   .. attribute:: var global_epoch: unmanaged GlobalEpoch
-
-   .. attribute:: var locale_epoch: atomicuint
-
-   .. attribute:: var active_tasks: atomicuint
-
-   .. attribute:: var is_setting_epoch: atomicbool
-
-   .. attribute:: var allocated_list: unmanaged LockFreeLinkedList(unmanaged _token)
-
-   .. attribute:: var free_list: unmanaged LockFreeQueue(unmanaged _token)
-
-   .. attribute:: var limbo_list: [1..EBR_EPOCHS] unmanaged LimboList()
-
-   .. attribute:: var id_counter: atomicuint
-
-   .. attribute:: var objsToDelete: [LocaleSpace] unmanaged Vector(unmanaged object)
-
-   .. method:: proc init()
-
-   .. method:: proc init(other, privatizedData, global_epoch)
-
-   .. method:: proc deinit()
+      
+      Total number of epochs
+      
 
    .. method:: proc register(): owned TokenWrapper
 
-   .. method:: proc unregister(tok: unmanaged _token)
+      
+      Register a task.
+      
+      :returns: A handle to the manager
+      
 
-   .. method:: proc pin(tok: unmanaged _token)
+   .. method:: proc try_reclaim()
 
-   .. method:: proc getMinimumEpoch(): uint
-
-   .. method:: proc delete_obj(tok: unmanaged _token, x: unmanaged object)
-
-   .. method:: proc getReclaimEpoch(): uint
-
-   .. method:: proc try_reclaim(): uint
-
-   .. method:: proc unpin(tok: unmanaged _token)
+      
+      Try to announce a new epoch. If successful, reclaim objects which are
+      safe to reclaim
+      
 
    .. method:: proc clear()
 
-   .. method:: proc dsiPrivatize(privatizedData)
-
-   .. method:: proc dsiGetPrivatizeData()
-
-   .. method:: proc getPrivatizedInstance()
-
-.. class:: GlobalEpoch
-
-   .. attribute:: var epoch: atomicuint
-
-   .. attribute:: var is_setting_epoch: atomicbool
-
-   .. method:: proc init(x: uint)
-
-.. class:: _token
-
-   .. attribute:: var local_epoch: atomicuint
-
-   .. attribute:: const id: uint
-
-   .. attribute:: var is_registered: atomicbool
-
-   .. attribute:: var manager: unmanaged DistributedEpochManagerImpl
-
-   .. method:: proc init(x: uint, manager: unmanaged DistributedEpochManagerImpl)
-
-   .. method:: proc pin()
-
-   .. method:: proc unpin()
-
-   .. method:: proc delete_obj(x)
-
-   .. method:: proc try_reclaim()
-
-   .. method:: proc unregister()
+      
+      Destroy all objects. Not thread-safe
+      
 
 .. class:: TokenWrapper
 
-   .. attribute:: var _tok: unmanaged _token
+   
+   Handle to :record:`DistributedEpochManager`
+   
 
-   .. attribute:: var manager: unmanaged DistributedEpochManagerImpl
-
-   .. method:: proc init(_tok: unmanaged _token, manager: unmanaged DistributedEpochManagerImpl)
 
    .. method:: proc pin()
 
+      
+      `Pin` a task
+      
+
    .. method:: proc unpin()
+
+      
+      `Unpin` a task
+      
 
    .. method:: proc delete_obj(x)
 
+      
+      Delete an object.
+      
+      :arg x: The class instance to be deleted. Must be of unmanaged class type
+      
+
    .. method:: proc try_reclaim()
+
+      
+      Try to announce a new epoch. If successful, reclaim objects which are
+      safe to reclaim
+      
 
    .. method:: proc unregister()
 
+      
+      Unregister the handle from the manager
+      
+
    .. method:: proc deinit()
 
-.. data:: config const numObjects = 2
-
-.. data:: var objsDom = {0..#numObjects} dmapped Cyclic(startIdx = 0)
-
-.. data:: var objs: [objsDom] unmanaged object()
-
-.. data:: var manager = new DistributedEpochManager()
-
-.. data:: var timer = new Timer()
+      
+      Unregister the handle from the manager
+      
 
