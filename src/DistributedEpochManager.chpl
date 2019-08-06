@@ -7,6 +7,9 @@ To use the :record:`DistributedEpochManager`, first create an instance.
  var manager = new DistributedEpochManager();
 
 
+Registering a Task
+------------------
+
 A task must be registered with the manager in order to use the manager.
 Registration returns a token.
 
@@ -15,6 +18,8 @@ Registration returns a token.
  var tok = manager.register();
 
 
+Pinning/Unpinning a Task
+------------------------
 To avoid reclamation while a task is accessing a resource, I.E. to enter
 critical section, a task must `pin`. Correspondingly to exit critical section,
 the task must `unpin`.
@@ -29,6 +34,8 @@ the task must `unpin`.
  tok.unpin();
 
 
+Deleting an object
+------------------
 To `delete` an object:
 
 .. code-block:: chapel
@@ -41,6 +48,8 @@ To `delete` an object:
  delete ``unmanaged`` objects.
 
 
+Reclaiming deleted objects
+--------------------------
 To try to reclaim memory:
 
 .. code-block:: chapel
@@ -52,6 +61,8 @@ To try to reclaim memory:
  Alternatively, a task may call ``manager.try_reclaim()``.
 
 
+Unregister a Task
+-----------------
 In the end, a registered task needs to `unregister` from the manager. The
 registration token is a scoped variable, and hence the ending of the scope in
 which the task registered would automatically `unregister` the task.
@@ -62,6 +73,8 @@ which the task registered would automatically `unregister` the task.
  tok.unregister();
 
 
+Destroy
+-------
 To destroy the manager, and reclaim all the memory managed by the manager:
 
 .. code-block:: chapel

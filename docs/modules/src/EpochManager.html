@@ -1,0 +1,400 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>EpochManager &mdash; chpldoc 0.0.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="chpldoc 0.0.1 documentation" href="../../index.html"/>
+        <link rel="prev" title="DistributedEpochManager" href="DistributedEpochManager.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> chpldoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">chpldoc documentation</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="DistributedEpochManager.html">DistributedEpochManager</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="">EpochManager</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">chpldoc</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+    <li>EpochManager</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/modules/src/EpochManager.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <span class="target" id="module-EpochManager"></span><div class="section" id="epochmanager">
+<h1>EpochManager<a class="headerlink" href="#epochmanager" title="Permalink to this headline">¶</a></h1>
+<p><strong>Usage</strong></p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="k">use</span> <span class="nx">EpochManager</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>To use the <a class="reference internal" href="#module-EpochManager" title="EpochManager: To use the :class:`EpochManager`, first create an instance."><code class="xref chpl chpl-class docutils literal"><span class="pre">EpochManager</span></code></a>, first create an instance.</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">manager</span> <span class="o">=</span> <span class="k">new</span> <span class="k">unmanaged</span> <span class="nx">EpochManager</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>A task must be registered with the manager in order to use the manager.
+Registration returns a token.</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">tok</span> <span class="o">=</span> <span class="nx">manager</span><span class="p">.</span><span class="nx">register</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>To avoid reclamation while a task is accessing a resource, I.E. to enter
+critical section, a task must <cite>pin</cite>. Correspondingly to exit critical section,
+the task must <cite>unpin</cite>.</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="c1">// Enter critical section</span>
+<span class="nx">tok</span><span class="p">.</span><span class="nx">pin</span><span class="p">();</span>
+<span class="c1">// Do something</span>
+
+<span class="c1">// Exit critical section</span>
+<span class="nx">tok</span><span class="p">.</span><span class="nx">unpin</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>To <cite>delete</cite> an object:</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">delete_obj</span><span class="p">(</span><span class="nx">myObj</span><span class="p">);</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">A task must be <cite>pinned</cite> to <cite>delete</cite> an object. The manager can only be used to
+delete <code class="docutils literal"><span class="pre">unmanaged</span></code> objects.</p>
+</div>
+<p>To try to reclaim memory:</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">try_reclaim</span><span class="p">();</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Alternatively, a task may call <code class="docutils literal"><span class="pre">manager.try_reclaim()</span></code>.</p>
+</div>
+<p>In the end, a registered task needs to <cite>unregister</cite> from the manager. The
+registration token is a scoped variable, and hence the ending of the scope in
+which the task registered would automatically <cite>unregister</cite> the task.
+<cite>unregister</cite> can also be performed manually:</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">unregister</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>To destroy the manager, and reclaim all the memory managed by the manager:</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="k">delete</span> <span class="nx">manager</span><span class="p">;</span>
+</pre></div>
+</div>
+<dl class="class">
+<dt id="EpochManager.EpochManager">
+<em class="property">class </em><code class="descname">EpochManager</code><a class="headerlink" href="#EpochManager.EpochManager" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="attribute">
+<dt id="EpochManager.EpochManager.EBR_EPOCHS">
+<em class="property">const </em><code class="descname">EBR_EPOCHS</code>: uint = 3<a class="headerlink" href="#EpochManager.EpochManager.EBR_EPOCHS" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="EpochManager.EpochManager.INACTIVE">
+<em class="property">const </em><code class="descname">INACTIVE</code>: uint = 0<a class="headerlink" href="#EpochManager.EpochManager.INACTIVE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="EpochManager.EpochManager.global_epoch">
+<em class="property">var </em><code class="descname">global_epoch</code>: atomicuint<a class="headerlink" href="#EpochManager.EpochManager.global_epoch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="EpochManager.EpochManager.is_setting_epoch">
+<em class="property">var </em><code class="descname">is_setting_epoch</code>: atomicbool<a class="headerlink" href="#EpochManager.EpochManager.is_setting_epoch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="EpochManager.EpochManager.allocated_list">
+<em class="property">var </em><code class="descname">allocated_list</code>: unmanaged LockFreeLinkedList(unmanaged _token)<a class="headerlink" href="#EpochManager.EpochManager.allocated_list" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="EpochManager.EpochManager.free_list">
+<em class="property">var </em><code class="descname">free_list</code>: unmanaged LockFreeQueue(unmanaged _token)<a class="headerlink" href="#EpochManager.EpochManager.free_list" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="EpochManager.EpochManager.limbo_list">
+<em class="property">var </em><code class="descname">limbo_list</code>: [1..EBR_EPOCHS] unmanaged LimboList()<a class="headerlink" href="#EpochManager.EpochManager.limbo_list" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="EpochManager.EpochManager.id_counter">
+<em class="property">var </em><code class="descname">id_counter</code>: atomicuint<a class="headerlink" href="#EpochManager.EpochManager.id_counter" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.EpochManager.init">
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManager.init" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.EpochManager.register">
+<em class="property">proc </em><code class="descname">register</code><span class="sig-paren">(</span><span class="sig-paren">)</span>: owned TokenWrapper<a class="headerlink" href="#EpochManager.EpochManager.register" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.EpochManager.unregister">
+<em class="property">proc </em><code class="descname">unregister</code><span class="sig-paren">(</span><em>tok: unmanaged _token</em><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManager.unregister" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.EpochManager.pin">
+<em class="property">proc </em><code class="descname">pin</code><span class="sig-paren">(</span><em>tok: unmanaged _token</em><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManager.pin" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.EpochManager.unpin">
+<em class="property">proc </em><code class="descname">unpin</code><span class="sig-paren">(</span><em>tok: unmanaged _token</em><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManager.unpin" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.EpochManager.try_advance">
+<em class="property">proc </em><code class="descname">try_advance</code><span class="sig-paren">(</span><span class="sig-paren">)</span>: uint<a class="headerlink" href="#EpochManager.EpochManager.try_advance" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.EpochManager.delete_obj">
+<em class="property">proc </em><code class="descname">delete_obj</code><span class="sig-paren">(</span><em>tok: unmanaged _token</em>, <em>x: unmanaged object</em><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManager.delete_obj" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.EpochManager.try_reclaim">
+<em class="property">proc </em><code class="descname">try_reclaim</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManager.try_reclaim" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.EpochManager.deinit">
+<em class="property">proc </em><code class="descname">deinit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManager.deinit" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="EpochManager.TokenWrapper">
+<em class="property">class </em><code class="descname">TokenWrapper</code><a class="headerlink" href="#EpochManager.TokenWrapper" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle to <a class="reference internal" href="#module-EpochManager" title="EpochManager: To use the :class:`EpochManager`, first create an instance."><code class="xref chpl chpl-class docutils literal"><span class="pre">EpochManager</span></code></a></p>
+<dl class="method">
+<dt id="EpochManager.TokenWrapper.pin">
+<em class="property">proc </em><code class="descname">pin</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.TokenWrapper.pin" title="Permalink to this definition">¶</a></dt>
+<dd><p><cite>Pin</cite> a task</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.TokenWrapper.unpin">
+<em class="property">proc </em><code class="descname">unpin</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.TokenWrapper.unpin" title="Permalink to this definition">¶</a></dt>
+<dd><p><cite>Unpin</cite> a task</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.TokenWrapper.delete_obj">
+<em class="property">proc </em><code class="descname">delete_obj</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.TokenWrapper.delete_obj" title="Permalink to this definition">¶</a></dt>
+<dd><p>Delete an object.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Arguments:</th><td class="field-body"><strong>x</strong> &#8211; The class instance to be deleted. Must be of unmanaged class type</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.TokenWrapper.try_reclaim">
+<em class="property">proc </em><code class="descname">try_reclaim</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.TokenWrapper.try_reclaim" title="Permalink to this definition">¶</a></dt>
+<dd><p>Try to announce a new epoch. If successful, reclaim objects which are
+safe to reclaim</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.TokenWrapper.unregister">
+<em class="property">proc </em><code class="descname">unregister</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.TokenWrapper.unregister" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unregister the handle from the manager</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.TokenWrapper.deinit">
+<em class="property">proc </em><code class="descname">deinit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.TokenWrapper.deinit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unregister the handle from the manager</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="DistributedEpochManager.html" class="btn btn-neutral" title="DistributedEpochManager" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, .
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+  
+ 
+
+
+
+</body>
+</html>

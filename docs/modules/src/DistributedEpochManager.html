@@ -84,7 +84,15 @@
 <li class="toctree-l1"><a class="reference internal" href="../../index.html">chpldoc documentation</a></li>
 </ul>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="">DistributedEpochManager</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="">DistributedEpochManager</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#registering-a-task">Registering a Task</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pinning-unpinning-a-task">Pinning/Unpinning a Task</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#deleting-an-object">Deleting an object</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reclaiming-deleted-objects">Reclaiming deleted objects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#unregister-a-task">Unregister a Task</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#destroy">Destroy</a></li>
+</ul>
+</li>
 </ul>
 
             
@@ -139,11 +147,16 @@
 <div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">manager</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">DistributedEpochManager</span><span class="p">();</span>
 </pre></div>
 </div>
+<div class="section" id="registering-a-task">
+<h2>Registering a Task<a class="headerlink" href="#registering-a-task" title="Permalink to this headline">¶</a></h2>
 <p>A task must be registered with the manager in order to use the manager.
 Registration returns a token.</p>
 <div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">tok</span> <span class="o">=</span> <span class="nx">manager</span><span class="p">.</span><span class="nx">register</span><span class="p">();</span>
 </pre></div>
 </div>
+</div>
+<div class="section" id="pinning-unpinning-a-task">
+<h2>Pinning/Unpinning a Task<a class="headerlink" href="#pinning-unpinning-a-task" title="Permalink to this headline">¶</a></h2>
 <p>To avoid reclamation while a task is accessing a resource, I.E. to enter
 critical section, a task must <cite>pin</cite>. Correspondingly to exit critical section,
 the task must <cite>unpin</cite>.</p>
@@ -155,6 +168,9 @@ the task must <cite>unpin</cite>.</p>
 <span class="nx">tok</span><span class="p">.</span><span class="nx">unpin</span><span class="p">();</span>
 </pre></div>
 </div>
+</div>
+<div class="section" id="deleting-an-object">
+<h2>Deleting an object<a class="headerlink" href="#deleting-an-object" title="Permalink to this headline">¶</a></h2>
 <p>To <cite>delete</cite> an object:</p>
 <div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">delete_obj</span><span class="p">(</span><span class="nx">myObj</span><span class="p">);</span>
 </pre></div>
@@ -164,6 +180,9 @@ the task must <cite>unpin</cite>.</p>
 <p class="last">A task must be <cite>pinned</cite> to <cite>delete</cite> an object. The manager can only be used to
 delete <code class="docutils literal"><span class="pre">unmanaged</span></code> objects.</p>
 </div>
+</div>
+<div class="section" id="reclaiming-deleted-objects">
+<h2>Reclaiming deleted objects<a class="headerlink" href="#reclaiming-deleted-objects" title="Permalink to this headline">¶</a></h2>
 <p>To try to reclaim memory:</p>
 <div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">try_reclaim</span><span class="p">();</span>
 </pre></div>
@@ -172,6 +191,9 @@ delete <code class="docutils literal"><span class="pre">unmanaged</span></code> 
 <p class="first admonition-title">Note</p>
 <p class="last">Alternatively, a task may call <code class="docutils literal"><span class="pre">manager.try_reclaim()</span></code>.</p>
 </div>
+</div>
+<div class="section" id="unregister-a-task">
+<h2>Unregister a Task<a class="headerlink" href="#unregister-a-task" title="Permalink to this headline">¶</a></h2>
 <p>In the end, a registered task needs to <cite>unregister</cite> from the manager. The
 registration token is a scoped variable, and hence the ending of the scope in
 which the task registered would automatically <cite>unregister</cite> the task.
@@ -179,6 +201,9 @@ which the task registered would automatically <cite>unregister</cite> the task.
 <div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">unregister</span><span class="p">();</span>
 </pre></div>
 </div>
+</div>
+<div class="section" id="destroy">
+<h2>Destroy<a class="headerlink" href="#destroy" title="Permalink to this headline">¶</a></h2>
 <p>To destroy the manager, and reclaim all the memory managed by the manager:</p>
 <div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">manager</span><span class="p">.</span><span class="nx">destroy</span><span class="p">();</span>
 </pre></div>
@@ -291,6 +316,7 @@ safe to reclaim</p>
 
 </dd></dl>
 
+</div>
 </div>
 
 
