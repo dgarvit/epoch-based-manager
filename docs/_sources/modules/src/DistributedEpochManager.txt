@@ -96,7 +96,7 @@ To destroy the manager, and reclaim all the memory managed by the manager:
    .. method:: proc init()
 
       
-      Default initialize with object of privatized class.
+      Default initialize with instance of privatized class.
       
 
    .. method:: proc destroy()
@@ -112,12 +112,6 @@ To destroy the manager, and reclaim all the memory managed by the manager:
    :record:`DistributedEpochManager`.
    
 
-
-   .. attribute:: const EBR_EPOCHS: uint = 3
-
-      
-      Total number of epochs
-      
 
    .. method:: proc register(): owned TokenWrapper
 

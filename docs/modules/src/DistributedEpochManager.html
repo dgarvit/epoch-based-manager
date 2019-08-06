@@ -195,7 +195,7 @@ thread-safety. It employs privatization.</p>
 <dl class="method">
 <dt id="DistributedEpochManager.DistributedEpochManager.init">
 <em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManager.init" title="Permalink to this definition">¶</a></dt>
-<dd><p>Default initialize with object of privatized class.</p>
+<dd><p>Default initialize with instance of privatized class.</p>
 </dd></dl>
 
 <dl class="method">
@@ -211,12 +211,6 @@ thread-safety. It employs privatization.</p>
 <em class="property">class </em><code class="descname">DistributedEpochManagerImpl</code><a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl" title="Permalink to this definition">¶</a></dt>
 <dd><p>The class which is privatized on each locale for
 <a class="reference internal" href="#module-DistributedEpochManager" title="DistributedEpochManager: To use the :record:`DistributedEpochManager`, first create an instance."><code class="xref chpl chpl-record docutils literal"><span class="pre">DistributedEpochManager</span></code></a>.</p>
-<dl class="attribute">
-<dt id="DistributedEpochManager.DistributedEpochManagerImpl.EBR_EPOCHS">
-<em class="property">const </em><code class="descname">EBR_EPOCHS</code>: uint = 3<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.EBR_EPOCHS" title="Permalink to this definition">¶</a></dt>
-<dd><p>Total number of epochs</p>
-</dd></dl>
-
 <dl class="method">
 <dt id="DistributedEpochManager.DistributedEpochManagerImpl.register">
 <em class="property">proc </em><code class="descname">register</code><span class="sig-paren">(</span><span class="sig-paren">)</span>: owned TokenWrapper<a class="headerlink" href="#DistributedEpochManager.DistributedEpochManagerImpl.register" title="Permalink to this definition">¶</a></dt>

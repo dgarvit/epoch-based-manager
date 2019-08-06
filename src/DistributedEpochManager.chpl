@@ -90,7 +90,7 @@ module DistributedEpochManager {
     var _pid : int = -1;
     
     /*
-      Default initialize with object of privatized class.
+      Default initialize with instance of privatized class.
     */
     proc init() {
       this._pid = (new unmanaged DistributedEpochManagerImpl()).pid;
@@ -117,9 +117,9 @@ module DistributedEpochManager {
     pragma "no doc"
     var pid : int;
 
-    /*
-      Total number of epochs
-    */
+
+    //  Total number of epochs
+    pragma "no doc"
     const EBR_EPOCHS : uint = 3;
 
     pragma "no doc"
@@ -520,7 +520,7 @@ module DistributedEpochManager {
 
   pragma "no doc"
   proc main() {
-    config const numObjects = 2;
+    const numObjects = 2;
     var objsDom = {0..#numObjects} dmapped Cyclic(startIdx=0);
     var objs : [objsDom] unmanaged object();
     var manager = new DistributedEpochManager();
