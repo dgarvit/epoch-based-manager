@@ -207,54 +207,9 @@ ACM symposium on Parallelism in algorithms and architectures. ACM, 2004.</td></t
 </tbody>
 </table>
 <dl class="class">
-<dt id="LockFreeStack.Node">
-<em class="property">class </em><code class="descname">Node</code><a class="headerlink" href="#LockFreeStack.Node" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="attribute">
-<dt id="LockFreeStack.Node.eltType">
-<em class="property">type </em><code class="descname">eltType</code><a class="headerlink" href="#LockFreeStack.Node.eltType" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="LockFreeStack.Node.val">
-<em class="property">var </em><code class="descname">val</code>: eltType<a class="headerlink" href="#LockFreeStack.Node.val" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="LockFreeStack.Node.next">
-<em class="property">var </em><code class="descname">next</code>: unmanaged Node(eltType)<a class="headerlink" href="#LockFreeStack.Node.next" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="LockFreeStack.Node.init">
-<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>val: ?eltType</em><span class="sig-paren">)</span><a class="headerlink" href="#LockFreeStack.Node.init" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt>
-<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>type eltType</em><span class="sig-paren">)</span></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="class">
 <dt id="LockFreeStack.LockFreeStack">
 <em class="property">class </em><code class="descname">LockFreeStack</code><a class="headerlink" href="#LockFreeStack.LockFreeStack" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="attribute">
-<dt id="LockFreeStack.LockFreeStack.objType">
-<em class="property">type </em><code class="descname">objType</code><a class="headerlink" href="#LockFreeStack.LockFreeStack.objType" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="LockFreeStack.LockFreeStack._top">
-<em class="property">var </em><code class="descname">_top</code>: AtomicObject(unmanaged Node(objType), hasGlobalSupport = false, hasABASupport = false)<a class="headerlink" href="#LockFreeStack.LockFreeStack._top" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="LockFreeStack.LockFreeStack._manager">
-<em class="property">var </em><code class="descname">_manager</code> = new owned LocalEpochManager()<a class="headerlink" href="#LockFreeStack.LockFreeStack._manager" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
+<dd><dl class="method">
 <dt id="LockFreeStack.LockFreeStack.init">
 <em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>type objType</em><span class="sig-paren">)</span><a class="headerlink" href="#LockFreeStack.LockFreeStack.init" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>

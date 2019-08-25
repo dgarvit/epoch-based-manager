@@ -84,25 +84,7 @@ end and will optimally create one token per task.
     "A scalable lock-free stack algorithm." Proceedings of the sixteenth annual 
     ACM symposium on Parallelism in algorithms and architectures. ACM, 2004.
 
-.. class:: Node
-
-   .. attribute:: type eltType
-
-   .. attribute:: var val: eltType
-
-   .. attribute:: var next: unmanaged Node(eltType)
-
-   .. method:: proc init(val: ?eltType)
-
-   .. method:: proc init(type eltType)
-
 .. class:: LockFreeStack
-
-   .. attribute:: type objType
-
-   .. attribute:: var _top: AtomicObject(unmanaged Node(objType), hasGlobalSupport = false, hasABASupport = false)
-
-   .. attribute:: var _manager = new owned LocalEpochManager()
 
    .. method:: proc init(type objType)
 

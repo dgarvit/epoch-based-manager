@@ -84,27 +84,7 @@ end and will optimally create one token per task.
     Simple, Fast, and Practical Non-Blocking and Blocking Concurrent Queue Algorithms. 
     No. TR-600. ROCHESTER UNIV NY DEPT OF COMPUTER SCIENCE, 1995.
 
-.. class:: Node
-
-   .. attribute:: type eltType
-
-   .. attribute:: var val: eltType
-
-   .. attribute:: var next: AtomicObject(unmanaged Node(eltType), hasGlobalSupport = false, hasABASupport = false)
-
-   .. method:: proc init(val: ?eltType)
-
-   .. method:: proc init(type eltType)
-
 .. class:: LockFreeQueue
-
-   .. attribute:: type objType
-
-   .. attribute:: var _head: AtomicObject(unmanaged Node(objType), hasGlobalSupport = false, hasABASupport = false)
-
-   .. attribute:: var _tail: AtomicObject(unmanaged Node(objType), hasGlobalSupport = false, hasABASupport = false)
-
-   .. attribute:: var _manager = new owned LocalEpochManager()
 
    .. method:: proc init(type objType)
 

@@ -94,6 +94,7 @@ module LockFreeQueue {
   use EpochManager;
   use AtomicObjects;
 
+  pragma "no doc"
   class Node {
     type eltType;
     var val : eltType;
@@ -110,9 +111,16 @@ module LockFreeQueue {
   }
 
   class LockFreeQueue {
+    pragma "no doc"
     type objType;
+
+    pragma "no doc"
     var _head : AtomicObject(unmanaged Node(objType), hasGlobalSupport=false, hasABASupport=false);
+
+    pragma "no doc"
     var _tail : AtomicObject(unmanaged Node(objType), hasGlobalSupport=false, hasABASupport=false);
+
+    pragma "no doc"
     var _manager = new owned LocalEpochManager();
 
     proc init(type objType) {

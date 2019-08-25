@@ -95,6 +95,7 @@ module LockFreeStack {
   use EpochManager;
   use AtomicObjects;
 
+  pragma "no doc"
   class Node {
     type eltType;
     var val : eltType;
@@ -111,8 +112,13 @@ module LockFreeStack {
   }
 
   class LockFreeStack {
+    pragma "no doc"
     type objType;
+
+    pragma "no doc"
     var _top : AtomicObject(unmanaged Node(objType), hasGlobalSupport=false, hasABASupport=false);
+
+    pragma "no doc"
     var _manager = new owned LocalEpochManager();
 
     proc init(type objType) {

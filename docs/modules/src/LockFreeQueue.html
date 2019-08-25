@@ -208,59 +208,9 @@ No. TR-600. ROCHESTER UNIV NY DEPT OF COMPUTER SCIENCE, 1995.</td></tr>
 </tbody>
 </table>
 <dl class="class">
-<dt id="LockFreeQueue.Node">
-<em class="property">class </em><code class="descname">Node</code><a class="headerlink" href="#LockFreeQueue.Node" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="attribute">
-<dt id="LockFreeQueue.Node.eltType">
-<em class="property">type </em><code class="descname">eltType</code><a class="headerlink" href="#LockFreeQueue.Node.eltType" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="LockFreeQueue.Node.val">
-<em class="property">var </em><code class="descname">val</code>: eltType<a class="headerlink" href="#LockFreeQueue.Node.val" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="LockFreeQueue.Node.next">
-<em class="property">var </em><code class="descname">next</code>: AtomicObject(unmanaged Node(eltType), hasGlobalSupport = false, hasABASupport = false)<a class="headerlink" href="#LockFreeQueue.Node.next" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt id="LockFreeQueue.Node.init">
-<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>val: ?eltType</em><span class="sig-paren">)</span><a class="headerlink" href="#LockFreeQueue.Node.init" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
-<dt>
-<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>type eltType</em><span class="sig-paren">)</span></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="class">
 <dt id="LockFreeQueue.LockFreeQueue">
 <em class="property">class </em><code class="descname">LockFreeQueue</code><a class="headerlink" href="#LockFreeQueue.LockFreeQueue" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="attribute">
-<dt id="LockFreeQueue.LockFreeQueue.objType">
-<em class="property">type </em><code class="descname">objType</code><a class="headerlink" href="#LockFreeQueue.LockFreeQueue.objType" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="LockFreeQueue.LockFreeQueue._head">
-<em class="property">var </em><code class="descname">_head</code>: AtomicObject(unmanaged Node(objType), hasGlobalSupport = false, hasABASupport = false)<a class="headerlink" href="#LockFreeQueue.LockFreeQueue._head" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="LockFreeQueue.LockFreeQueue._tail">
-<em class="property">var </em><code class="descname">_tail</code>: AtomicObject(unmanaged Node(objType), hasGlobalSupport = false, hasABASupport = false)<a class="headerlink" href="#LockFreeQueue.LockFreeQueue._tail" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="attribute">
-<dt id="LockFreeQueue.LockFreeQueue._manager">
-<em class="property">var </em><code class="descname">_manager</code> = new owned LocalEpochManager()<a class="headerlink" href="#LockFreeQueue.LockFreeQueue._manager" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="method">
+<dd><dl class="method">
 <dt id="LockFreeQueue.LockFreeQueue.init">
 <em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>type objType</em><span class="sig-paren">)</span><a class="headerlink" href="#LockFreeQueue.LockFreeQueue.init" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
