@@ -1,0 +1,374 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>LockFreeQueue &mdash; chpldoc 0.0.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="chpldoc 0.0.1 documentation" href="../../index.html"/>
+        <link rel="next" title="LockFreeStack" href="LockFreeStack.html"/>
+        <link rel="prev" title="EpochManager" href="EpochManager.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> chpldoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">chpldoc documentation</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="AtomicObjects.html">AtomicObjects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="EpochManager.html">EpochManager</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="">LockFreeQueue</a></li>
+<li class="toctree-l1"><a class="reference internal" href="LockFreeStack.html">LockFreeStack</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">chpldoc</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+    <li>LockFreeQueue</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/modules/src/LockFreeQueue.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <span class="target" id="module-LockFreeQueue"></span><div class="section" id="lockfreequeue">
+<h1>LockFreeQueue<a class="headerlink" href="#lockfreequeue" title="Permalink to this headline">¶</a></h1>
+<p><strong>Usage</strong></p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="k">use</span> <span class="nx">LockFreeQueue</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>An implementation of the Michael &amp; Scott <a class="footnote-reference" href="#id2" id="id1">[1]</a>, a lock-free queue. Concurrent safe
+memory reclamation is handled by an internal <a class="reference internal" href="EpochManager.html#module-EpochManager" title="EpochManager: To use the :class:`LocalEpochManager`, first create an instance."><code class="xref chpl chpl-record docutils literal"><span class="pre">EpochManager</span></code></a>. Usage of the
+queue can be seen below.</p>
+<div class="highlight-chpl"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">lfq</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">LockFreeQueue</span><span class="p">(</span><span class="kt">int</span><span class="p">);</span>
+<span class="k">forall</span> <span class="nx">i</span> <span class="kd">in</span> <span class="mi">1</span><span class="o">..</span><span class="nx">N</span> <span class="k">do</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">enqueue</span><span class="p">(</span><span class="nx">i</span><span class="p">);</span>
+<span class="kd">var</span> <span class="nx">total</span> <span class="p">:</span> <span class="kt">int</span><span class="p">;</span>
+<span class="k">coforall</span> <span class="nx">tid</span> <span class="kd">in</span> <span class="mi">1</span><span class="o">..</span><span class="nx">here</span><span class="p">.</span><span class="nx">maxTaskPar</span> <span class="k">with</span> <span class="p">(</span><span class="o">+</span> <span class="k">reduce</span> <span class="nx">total</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kd">var</span> <span class="p">(</span><span class="nx">hasElt</span><span class="p">,</span> <span class="nx">elt</span><span class="p">)</span> <span class="o">=</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">dequeue</span><span class="p">();</span>
+  <span class="k">while</span> <span class="nx">hasElt</span> <span class="p">{</span>
+    <span class="nx">total</span> <span class="o">+=</span> <span class="nx">elt</span><span class="p">;</span>
+    <span class="p">(</span><span class="nx">hasElt</span><span class="p">,</span> <span class="nx">elt</span><span class="p">)</span> <span class="o">=</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">dequeue</span><span class="p">();</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>As an optimization, the user can register to receive a <code class="xref chpl chpl-class docutils literal"><span class="pre">TokenWrapper</span></code>, and pass this
+to the stack. This can provide significant improvement in performance by up to an order of magnitude
+by avoiding the overhead of registering and unregistering for each operation.</p>
+<div class="highlight-chpl"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">lfq</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">LockFreeQueue</span><span class="p">(</span><span class="kt">int</span><span class="p">);</span>
+<span class="k">forall</span> <span class="nx">i</span> <span class="kd">in</span> <span class="mi">1</span><span class="o">..</span><span class="nx">N</span> <span class="k">with</span> <span class="p">(</span><span class="kd">var</span> <span class="nx">tok</span> <span class="o">=</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">getToken</span><span class="p">())</span> <span class="k">do</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">enqueue</span><span class="p">(</span><span class="nx">i</span><span class="p">,</span><span class="nx">tok</span><span class="p">);</span>
+<span class="kd">var</span> <span class="nx">total</span> <span class="p">:</span> <span class="kt">int</span><span class="p">;</span>
+<span class="k">coforall</span> <span class="nx">tid</span> <span class="kd">in</span> <span class="mi">1</span><span class="o">..</span><span class="nx">here</span><span class="p">.</span><span class="nx">maxTaskPar</span> <span class="k">with</span> <span class="p">(</span><span class="o">+</span> <span class="k">reduce</span> <span class="nx">total</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kd">var</span> <span class="nx">tok</span> <span class="o">=</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">getToken</span><span class="p">();</span>
+  <span class="kd">var</span> <span class="p">(</span><span class="nx">hasElt</span><span class="p">,</span> <span class="nx">elt</span><span class="p">)</span> <span class="o">=</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">dequeue</span><span class="p">(</span><span class="nx">tok</span><span class="p">);</span>
+  <span class="k">while</span> <span class="nx">hasElt</span> <span class="p">{</span>
+    <span class="nx">total</span> <span class="o">+=</span> <span class="nx">elt</span><span class="p">;</span>
+    <span class="p">(</span><span class="nx">hasElt</span><span class="p">,</span> <span class="nx">elt</span><span class="p">)</span> <span class="o">=</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">dequeue</span><span class="p">(</span><span class="nx">tok</span><span class="p">);</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Lastly, to safely reclaim memory, the user must explicitly invoke <code class="docutils literal"><span class="pre">tryReclaim</span></code>, or else
+there will be a memory leak. This must be explicitly invoked so that the user may tune how often
+reclamation will be attempted. Reclamation is concurrent-safe, but if called too frequently,
+it can add unnecessary overhead. A complete example of what would be considered &#8216;optimal&#8217;
+usage of this lock-free stack.</p>
+<div class="highlight-chpl"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">lfq</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">LockFreeQueue</span><span class="p">(</span><span class="kt">int</span><span class="p">);</span>
+<span class="k">forall</span> <span class="nx">i</span> <span class="kd">in</span> <span class="mi">1</span><span class="o">..</span><span class="nx">N</span> <span class="k">with</span> <span class="p">(</span><span class="kd">var</span> <span class="nx">tok</span> <span class="o">=</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">getToken</span><span class="p">())</span> <span class="k">do</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="nx">i</span><span class="p">,</span><span class="nx">tok</span><span class="p">);</span>
+<span class="kd">var</span> <span class="nx">total</span> <span class="p">:</span> <span class="kt">int</span><span class="p">;</span>
+<span class="k">coforall</span> <span class="nx">tid</span> <span class="kd">in</span> <span class="mi">1</span><span class="o">..</span><span class="nx">here</span><span class="p">.</span><span class="nx">maxTaskPar</span> <span class="k">with</span> <span class="p">(</span><span class="o">+</span> <span class="k">reduce</span> <span class="nx">total</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kd">var</span> <span class="nx">tok</span> <span class="o">=</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">getToken</span><span class="p">();</span>
+  <span class="kd">var</span> <span class="p">(</span><span class="nx">hasElt</span><span class="p">,</span> <span class="nx">elt</span><span class="p">)</span> <span class="o">=</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">dequeue</span><span class="p">(</span><span class="nx">tok</span><span class="p">);</span>
+  <span class="kd">var</span> <span class="nx">n</span> <span class="p">:</span> <span class="kt">int</span><span class="p">;</span>
+  <span class="k">while</span> <span class="nx">hasElt</span> <span class="p">{</span>
+    <span class="nx">total</span> <span class="o">+=</span> <span class="nx">elt</span><span class="p">;</span>
+    <span class="p">(</span><span class="nx">hasElt</span><span class="p">,</span> <span class="nx">elt</span><span class="p">)</span> <span class="o">=</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">dequeue</span><span class="p">(</span><span class="nx">tok</span><span class="p">);</span>
+    <span class="nx">n</span> <span class="o">+=</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="k">if</span> <span class="nx">n</span> <span class="o">%</span> <span class="nx">GC_THRESHOLD</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">then</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">tryReclaim</span><span class="p">();</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Also provided, is a utility method for draining the stack of all elements,
+called <code class="docutils literal"><span class="pre">drain</span></code>. This iterator will implicitly call <code class="docutils literal"><span class="pre">tryReclaim</span></code> at the
+end and will optimally create one token per task.</p>
+<div class="highlight-chpl"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">lfq</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">LockFreeQueue</span><span class="p">(</span><span class="kt">int</span><span class="p">);</span>
+<span class="k">forall</span> <span class="nx">i</span> <span class="kd">in</span> <span class="mi">1</span><span class="o">..</span><span class="nx">N</span> <span class="k">with</span> <span class="p">(</span><span class="kd">var</span> <span class="nx">tok</span> <span class="o">=</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">getToken</span><span class="p">())</span> <span class="k">do</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">enqueue</span><span class="p">(</span><span class="nx">i</span><span class="p">,</span><span class="nx">tok</span><span class="p">);</span>
+<span class="kd">var</span> <span class="nx">total</span> <span class="o">=</span> <span class="o">+</span> <span class="k">reduce</span> <span class="nx">lfq</span><span class="p">.</span><span class="nx">drain</span><span class="p">();</span>
+</pre></div>
+</div>
+<table class="docutils footnote" frame="void" id="id2" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>Michael, Maged M., and Michael L. Scott.
+Simple, Fast, and Practical Non-Blocking and Blocking Concurrent Queue Algorithms.
+No. TR-600. ROCHESTER UNIV NY DEPT OF COMPUTER SCIENCE, 1995.</td></tr>
+</tbody>
+</table>
+<dl class="class">
+<dt id="LockFreeQueue.Node">
+<em class="property">class </em><code class="descname">Node</code><a class="headerlink" href="#LockFreeQueue.Node" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="attribute">
+<dt id="LockFreeQueue.Node.eltType">
+<em class="property">type </em><code class="descname">eltType</code><a class="headerlink" href="#LockFreeQueue.Node.eltType" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="LockFreeQueue.Node.val">
+<em class="property">var </em><code class="descname">val</code>: eltType<a class="headerlink" href="#LockFreeQueue.Node.val" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="LockFreeQueue.Node.next">
+<em class="property">var </em><code class="descname">next</code>: AtomicObject(unmanaged Node(eltType), hasGlobalSupport = false, hasABASupport = false)<a class="headerlink" href="#LockFreeQueue.Node.next" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="LockFreeQueue.Node.init">
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>val: ?eltType</em><span class="sig-paren">)</span><a class="headerlink" href="#LockFreeQueue.Node.init" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt>
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>type eltType</em><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="LockFreeQueue.LockFreeQueue">
+<em class="property">class </em><code class="descname">LockFreeQueue</code><a class="headerlink" href="#LockFreeQueue.LockFreeQueue" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="attribute">
+<dt id="LockFreeQueue.LockFreeQueue.objType">
+<em class="property">type </em><code class="descname">objType</code><a class="headerlink" href="#LockFreeQueue.LockFreeQueue.objType" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="LockFreeQueue.LockFreeQueue._head">
+<em class="property">var </em><code class="descname">_head</code>: AtomicObject(unmanaged Node(objType), hasGlobalSupport = false, hasABASupport = false)<a class="headerlink" href="#LockFreeQueue.LockFreeQueue._head" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="LockFreeQueue.LockFreeQueue._tail">
+<em class="property">var </em><code class="descname">_tail</code>: AtomicObject(unmanaged Node(objType), hasGlobalSupport = false, hasABASupport = false)<a class="headerlink" href="#LockFreeQueue.LockFreeQueue._tail" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="LockFreeQueue.LockFreeQueue._manager">
+<em class="property">var </em><code class="descname">_manager</code> = new owned LocalEpochManager()<a class="headerlink" href="#LockFreeQueue.LockFreeQueue._manager" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="LockFreeQueue.LockFreeQueue.init">
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>type objType</em><span class="sig-paren">)</span><a class="headerlink" href="#LockFreeQueue.LockFreeQueue.init" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="LockFreeQueue.LockFreeQueue.getToken">
+<em class="property">proc </em><code class="descname">getToken</code><span class="sig-paren">(</span><span class="sig-paren">)</span>: owned TokenWrapper<a class="headerlink" href="#LockFreeQueue.LockFreeQueue.getToken" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="LockFreeQueue.LockFreeQueue.enqueue">
+<em class="property">proc </em><code class="descname">enqueue</code><span class="sig-paren">(</span><em>newObj: objType</em>, <em>tok: owned TokenWrapper = getToken()</em><span class="sig-paren">)</span><a class="headerlink" href="#LockFreeQueue.LockFreeQueue.enqueue" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="LockFreeQueue.LockFreeQueue.dequeue">
+<em class="property">proc </em><code class="descname">dequeue</code><span class="sig-paren">(</span><em>tok: owned TokenWrapper = getToken()</em><span class="sig-paren">)</span>: (bool, objType)<a class="headerlink" href="#LockFreeQueue.LockFreeQueue.dequeue" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="itermethod">
+<dt id="LockFreeQueue.LockFreeQueue.drain">
+<em class="property">iter </em><code class="descname">drain</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#LockFreeQueue.LockFreeQueue.drain" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="itermethod">
+<dt>
+<em class="property">iter </em><code class="descname">drain</code><span class="sig-paren">(</span><em>param tag: iterKind</em><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="LockFreeQueue.LockFreeQueue.tryReclaim">
+<em class="property">proc </em><code class="descname">tryReclaim</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#LockFreeQueue.LockFreeQueue.tryReclaim" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="LockFreeStack.html" class="btn btn-neutral float-right" title="LockFreeStack" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="EpochManager.html" class="btn btn-neutral" title="EpochManager" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, .
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+  
+ 
+
+
+
+</body>
+</html>

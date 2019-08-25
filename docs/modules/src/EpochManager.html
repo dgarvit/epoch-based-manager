@@ -31,7 +31,8 @@
 
   
     <link rel="top" title="chpldoc 0.0.1 documentation" href="../../index.html"/>
-        <link rel="prev" title="DistributedEpochManager" href="DistributedEpochManager.html"/> 
+        <link rel="next" title="LockFreeQueue" href="LockFreeQueue.html"/>
+        <link rel="prev" title="AtomicObjects" href="AtomicObjects.html"/> 
 
   
   <script src="../../_static/js/modernizr.min.js"></script>
@@ -84,7 +85,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../index.html">chpldoc documentation</a></li>
 </ul>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="DistributedEpochManager.html">DistributedEpochManager</a></li>
+<li class="toctree-l1"><a class="reference internal" href="AtomicObjects.html">AtomicObjects</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="">EpochManager</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#registering-a-task">Registering a Task</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#pinning-unpinning-a-task">Pinning/Unpinning a Task</a></li>
@@ -94,6 +95,8 @@
 <li class="toctree-l2"><a class="reference internal" href="#destroy">Destroy</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="LockFreeQueue.html">LockFreeQueue</a></li>
+<li class="toctree-l1"><a class="reference internal" href="LockFreeStack.html">LockFreeStack</a></li>
 </ul>
 
             
@@ -144,14 +147,14 @@
 <div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="k">use</span> <span class="nx">EpochManager</span><span class="p">;</span>
 </pre></div>
 </div>
-<p>To use the <a class="reference internal" href="#module-EpochManager" title="EpochManager: To use the :class:`EpochManager`, first create an instance."><code class="xref chpl chpl-class docutils literal"><span class="pre">EpochManager</span></code></a>, first create an instance.</p>
-<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">manager</span> <span class="o">=</span> <span class="k">new</span> <span class="k">unmanaged</span> <span class="nx">EpochManager</span><span class="p">();</span>
+<p>To use the <a class="reference internal" href="#EpochManager.LocalEpochManager" title="EpochManager.LocalEpochManager"><code class="xref chpl chpl-class docutils literal"><span class="pre">LocalEpochManager</span></code></a>, first create an instance.</p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">manager</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">LocalEpochManager</span><span class="p">();</span>
 </pre></div>
 </div>
 <div class="section" id="registering-a-task">
 <h2>Registering a Task<a class="headerlink" href="#registering-a-task" title="Permalink to this headline">¶</a></h2>
 <p>A task must be registered with the manager in order to use the manager.
-Registration returns a token.</p>
+Registration returns a token that is used when a task inters or exits a critical section.</p>
 <div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">tok</span> <span class="o">=</span> <span class="nx">manager</span><span class="p">.</span><span class="nx">register</span><span class="p">();</span>
 </pre></div>
 </div>
@@ -173,7 +176,7 @@ the task must <cite>unpin</cite>.</p>
 <div class="section" id="deleting-an-object">
 <h2>Deleting an object<a class="headerlink" href="#deleting-an-object" title="Permalink to this headline">¶</a></h2>
 <p>To <cite>delete</cite> an object:</p>
-<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">delete_obj</span><span class="p">(</span><span class="nx">myObj</span><span class="p">);</span>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">deferDelete</span><span class="p">(</span><span class="nx">myObj</span><span class="p">);</span>
 </pre></div>
 </div>
 <div class="admonition note">
@@ -185,19 +188,19 @@ delete <code class="docutils literal"><span class="pre">unmanaged</span></code> 
 <div class="section" id="reclaiming-deleted-objects">
 <h2>Reclaiming deleted objects<a class="headerlink" href="#reclaiming-deleted-objects" title="Permalink to this headline">¶</a></h2>
 <p>To try to reclaim memory:</p>
-<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">try_reclaim</span><span class="p">();</span>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">tryReclaim</span><span class="p">();</span>
 </pre></div>
 </div>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last">Alternatively, a task may call <code class="docutils literal"><span class="pre">manager.try_reclaim()</span></code>.</p>
+<p class="last">Alternatively, a task may call <code class="docutils literal"><span class="pre">manager.tryReclaim()</span></code>.</p>
 </div>
 </div>
 <div class="section" id="unregister-a-task">
 <h2>Unregister a Task<a class="headerlink" href="#unregister-a-task" title="Permalink to this headline">¶</a></h2>
 <p>In the end, a registered task needs to <cite>unregister</cite> from the manager. The
 registration token is a scoped variable, and hence the ending of the scope in
-which the task registered would automatically <cite>unregister</cite> the task.
+which the task registered wiill automatically <cite>unregister</cite> the task.
 <cite>unregister</cite> can also be performed manually:</p>
 <div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="nx">tok</span><span class="p">.</span><span class="nx">unregister</span><span class="p">();</span>
 </pre></div>
@@ -210,19 +213,19 @@ which the task registered would automatically <cite>unregister</cite> the task.
 </pre></div>
 </div>
 <dl class="class">
-<dt id="EpochManager.EpochManager">
-<em class="property">class </em><code class="descname">EpochManager</code><a class="headerlink" href="#EpochManager.EpochManager" title="Permalink to this definition">¶</a></dt>
-<dd><p><a class="reference internal" href="#module-EpochManager" title="EpochManager: To use the :class:`EpochManager`, first create an instance."><code class="xref chpl chpl-class docutils literal"><span class="pre">EpochManager</span></code></a> manages reclamation of objects, ensuring
+<dt id="EpochManager.LocalEpochManager">
+<em class="property">class </em><code class="descname">LocalEpochManager</code><a class="headerlink" href="#EpochManager.LocalEpochManager" title="Permalink to this definition">¶</a></dt>
+<dd><p><a class="reference internal" href="#EpochManager.LocalEpochManager" title="EpochManager.LocalEpochManager"><code class="xref chpl chpl-class docutils literal"><span class="pre">LocalEpochManager</span></code></a> manages reclamation of objects, ensuring
 thread-safety.</p>
 <dl class="method">
-<dt id="EpochManager.EpochManager.init">
-<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManager.init" title="Permalink to this definition">¶</a></dt>
+<dt id="EpochManager.LocalEpochManager.init">
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.LocalEpochManager.init" title="Permalink to this definition">¶</a></dt>
 <dd><p>Default initialize the manager.</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="EpochManager.EpochManager.register">
-<em class="property">proc </em><code class="descname">register</code><span class="sig-paren">(</span><span class="sig-paren">)</span>: owned TokenWrapper<a class="headerlink" href="#EpochManager.EpochManager.register" title="Permalink to this definition">¶</a></dt>
+<dt id="EpochManager.LocalEpochManager.register">
+<em class="property">proc </em><code class="descname">register</code><span class="sig-paren">(</span><span class="sig-paren">)</span>: owned TokenWrapper<a class="headerlink" href="#EpochManager.LocalEpochManager.register" title="Permalink to this definition">¶</a></dt>
 <dd><p>Register a task.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -235,15 +238,15 @@ thread-safety.</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="EpochManager.EpochManager.try_reclaim">
-<em class="property">proc </em><code class="descname">try_reclaim</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManager.try_reclaim" title="Permalink to this definition">¶</a></dt>
+<dt id="EpochManager.LocalEpochManager.tryReclaim">
+<em class="property">proc </em><code class="descname">tryReclaim</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.LocalEpochManager.tryReclaim" title="Permalink to this definition">¶</a></dt>
 <dd><p>Try to announce a new epoch. If successful, reclaim objects which are
 safe to reclaim</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="EpochManager.EpochManager.deinit">
-<em class="property">proc </em><code class="descname">deinit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManager.deinit" title="Permalink to this definition">¶</a></dt>
+<dt id="EpochManager.LocalEpochManager.deinit">
+<em class="property">proc </em><code class="descname">deinit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.LocalEpochManager.deinit" title="Permalink to this definition">¶</a></dt>
 <dd><p>Reclaim all objects</p>
 </dd></dl>
 
@@ -252,7 +255,7 @@ safe to reclaim</p>
 <dl class="class">
 <dt id="EpochManager.TokenWrapper">
 <em class="property">class </em><code class="descname">TokenWrapper</code><a class="headerlink" href="#EpochManager.TokenWrapper" title="Permalink to this definition">¶</a></dt>
-<dd><p>Handle to <a class="reference internal" href="#module-EpochManager" title="EpochManager: To use the :class:`EpochManager`, first create an instance."><code class="xref chpl chpl-class docutils literal"><span class="pre">EpochManager</span></code></a></p>
+<dd><p>Handle to <a class="reference internal" href="#EpochManager.LocalEpochManager" title="EpochManager.LocalEpochManager"><code class="xref chpl chpl-class docutils literal"><span class="pre">LocalEpochManager</span></code></a></p>
 <dl class="method">
 <dt id="EpochManager.TokenWrapper.pin">
 <em class="property">proc </em><code class="descname">pin</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.TokenWrapper.pin" title="Permalink to this definition">¶</a></dt>
@@ -266,8 +269,8 @@ safe to reclaim</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="EpochManager.TokenWrapper.delete_obj">
-<em class="property">proc </em><code class="descname">delete_obj</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.TokenWrapper.delete_obj" title="Permalink to this definition">¶</a></dt>
+<dt id="EpochManager.TokenWrapper.deferDelete">
+<em class="property">proc </em><code class="descname">deferDelete</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.TokenWrapper.deferDelete" title="Permalink to this definition">¶</a></dt>
 <dd><p>Delete an object.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -280,8 +283,8 @@ safe to reclaim</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="EpochManager.TokenWrapper.try_reclaim">
-<em class="property">proc </em><code class="descname">try_reclaim</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.TokenWrapper.try_reclaim" title="Permalink to this definition">¶</a></dt>
+<dt id="EpochManager.TokenWrapper.tryReclaim">
+<em class="property">proc </em><code class="descname">tryReclaim</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.TokenWrapper.tryReclaim" title="Permalink to this definition">¶</a></dt>
 <dd><p>Try to announce a new epoch. If successful, reclaim objects which are
 safe to reclaim</p>
 </dd></dl>
@@ -300,6 +303,110 @@ safe to reclaim</p>
 
 </dd></dl>
 
+<dl class="record">
+<dt id="EpochManager.EpochManager">
+<em class="property">record </em><code class="descname">EpochManager</code><a class="headerlink" href="#EpochManager.EpochManager" title="Permalink to this definition">¶</a></dt>
+<dd><p><a class="reference internal" href="#module-EpochManager" title="EpochManager: To use the :class:`LocalEpochManager`, first create an instance."><code class="xref chpl chpl-record docutils literal"><span class="pre">EpochManager</span></code></a> manages reclamation of objects, ensuring
+thread-safety. It employs privatization.</p>
+<dl class="method">
+<dt id="EpochManager.EpochManager.init">
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManager.init" title="Permalink to this definition">¶</a></dt>
+<dd><p>Default initialize with instance of privatized class.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.EpochManager.destroy">
+<em class="property">proc </em><code class="descname">destroy</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManager.destroy" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reclaim all allocated memory; destroy all privatized objects.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="EpochManager.EpochManagerImpl">
+<em class="property">class </em><code class="descname">EpochManagerImpl</code><a class="headerlink" href="#EpochManager.EpochManagerImpl" title="Permalink to this definition">¶</a></dt>
+<dd><p>The class which is privatized on each locale for
+<a class="reference internal" href="#module-EpochManager" title="EpochManager: To use the :class:`LocalEpochManager`, first create an instance."><code class="xref chpl chpl-record docutils literal"><span class="pre">EpochManager</span></code></a>.</p>
+<dl class="method">
+<dt id="EpochManager.EpochManagerImpl.register">
+<em class="property">proc </em><code class="descname">register</code><span class="sig-paren">(</span><span class="sig-paren">)</span>: owned DistTokenWrapper<a class="headerlink" href="#EpochManager.EpochManagerImpl.register" title="Permalink to this definition">¶</a></dt>
+<dd><p>Register a task.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body">A handle to the manager</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.EpochManagerImpl.tryReclaim">
+<em class="property">proc </em><code class="descname">tryReclaim</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManagerImpl.tryReclaim" title="Permalink to this definition">¶</a></dt>
+<dd><p>Try to announce a new epoch. If successful, reclaim objects which are
+safe to reclaim</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.EpochManagerImpl.clear">
+<em class="property">proc </em><code class="descname">clear</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.EpochManagerImpl.clear" title="Permalink to this definition">¶</a></dt>
+<dd><p>Destroy all objects. Not thread-safe</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="EpochManager.DistTokenWrapper">
+<em class="property">class </em><code class="descname">DistTokenWrapper</code><a class="headerlink" href="#EpochManager.DistTokenWrapper" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handle to <a class="reference internal" href="#module-EpochManager" title="EpochManager: To use the :class:`LocalEpochManager`, first create an instance."><code class="xref chpl chpl-record docutils literal"><span class="pre">EpochManager</span></code></a></p>
+<dl class="method">
+<dt id="EpochManager.DistTokenWrapper.pin">
+<em class="property">proc </em><code class="descname">pin</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.DistTokenWrapper.pin" title="Permalink to this definition">¶</a></dt>
+<dd><p><cite>Pin</cite> a task</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.DistTokenWrapper.unpin">
+<em class="property">proc </em><code class="descname">unpin</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.DistTokenWrapper.unpin" title="Permalink to this definition">¶</a></dt>
+<dd><p><cite>Unpin</cite> a task</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.DistTokenWrapper.deferDelete">
+<em class="property">proc </em><code class="descname">deferDelete</code><span class="sig-paren">(</span><em>x</em><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.DistTokenWrapper.deferDelete" title="Permalink to this definition">¶</a></dt>
+<dd><p>Delete an object.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Arguments:</th><td class="field-body"><strong>x</strong> &#8211; The class instance to be deleted. Must be of unmanaged class type</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.DistTokenWrapper.tryReclaim">
+<em class="property">proc </em><code class="descname">tryReclaim</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.DistTokenWrapper.tryReclaim" title="Permalink to this definition">¶</a></dt>
+<dd><p>Try to announce a new epoch. If successful, reclaim objects which are
+safe to reclaim</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.DistTokenWrapper.unregister">
+<em class="property">proc </em><code class="descname">unregister</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.DistTokenWrapper.unregister" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unregister the handle from the manager</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="EpochManager.DistTokenWrapper.deinit">
+<em class="property">proc </em><code class="descname">deinit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#EpochManager.DistTokenWrapper.deinit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unregister the handle from the manager</p>
+</dd></dl>
+
+</dd></dl>
+
 </div>
 </div>
 
@@ -310,8 +417,10 @@ safe to reclaim</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
+        <a href="LockFreeQueue.html" class="btn btn-neutral float-right" title="LockFreeQueue" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
-        <a href="DistributedEpochManager.html" class="btn btn-neutral" title="DistributedEpochManager" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+        <a href="AtomicObjects.html" class="btn btn-neutral" title="AtomicObjects" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

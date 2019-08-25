@@ -1,0 +1,549 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>AtomicObjects &mdash; chpldoc 0.0.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="chpldoc 0.0.1 documentation" href="../../index.html"/>
+        <link rel="next" title="EpochManager" href="EpochManager.html"/>
+        <link rel="prev" title="chpldoc documentation" href="../../index.html"/> 
+
+  
+  <script src="../../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> chpldoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">chpldoc documentation</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="">AtomicObjects</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#global-atomics">Global Atomics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#aba-wrapper">ABA Wrapper</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="EpochManager.html">EpochManager</a></li>
+<li class="toctree-l1"><a class="reference internal" href="LockFreeQueue.html">LockFreeQueue</a></li>
+<li class="toctree-l1"><a class="reference internal" href="LockFreeStack.html">LockFreeStack</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="../../index.html">chpldoc</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../../index.html">Docs</a> &raquo;</li>
+      
+    <li>AtomicObjects</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/modules/src/AtomicObjects.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <span class="target" id="module-AtomicObjects"></span><div class="section" id="atomicobjects">
+<h1>AtomicObjects<a class="headerlink" href="#atomicobjects" title="Permalink to this headline">¶</a></h1>
+<p><strong>Usage</strong></p>
+<div class="highlight-chapel"><div class="highlight"><pre><span></span><span class="k">use</span> <span class="nx">AtomicObjects</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">This package relies on Chapel <code class="docutils literal"><span class="pre">extern</span></code> code blocks and so requires that
+<code class="docutils literal"><span class="pre">CHPL_LLVM=llvm</span></code> or <code class="docutils literal"><span class="pre">CHPL_LLVM=system</span></code> and that the Chapel compiler is
+built with LLVM enabled. As well, currently only <code class="docutils literal"><span class="pre">CHPL_TARGET_ARCH=x86_64</span></code>
+is supported as we make use of the x86-64 instruction: <a class="reference external" href="https://www.felixcloutier.com/x86/cmpxchg8b:cmpxchg16b">CMPXCHG16B</a>.</p>
+</div>
+<p>This module provides support for performing atomic operations on pointers
+to  <code class="docutils literal"><span class="pre">unmanaged</span></code> classes, which can be thought of as building blocks for
+creating non-blocking algorithms and data structures.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Only <code class="docutils literal"><span class="pre">unmanaged</span></code> classes are supported as they are represented, internally,
+as raw 64-bit or 128-bit pointers. We do not support <code class="docutils literal"><span class="pre">shared</span></code> or <code class="docutils literal"><span class="pre">owned</span></code>
+objects as they are essentially wrappers around an <code class="docutils literal"><span class="pre">unmanaged</span></code> object, and
+<code class="docutils literal"><span class="pre">borrowed</span></code> objects require a static lifetime.</p>
+</div>
+<div class="section" id="global-atomics">
+<h2>Global Atomics<a class="headerlink" href="#global-atomics" title="Permalink to this headline">¶</a></h2>
+<p>By default, the <code class="docutils literal"><span class="pre">AtomicObject</span></code> can support atomic operations on potentially remote
+objects. This does add some additional overhead and can be turned off during initialization.</p>
+<div class="highlight-chpl"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">atomicVar</span> <span class="p">:</span> <span class="nx">AtomicObject</span><span class="p">(</span><span class="k">unmanaged</span> <span class="nx">Obj</span><span class="p">,</span> <span class="nx">hasGlobalSupport</span><span class="o">=</span><span class="kc">false</span><span class="p">);</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">Currently, <code class="docutils literal"><span class="pre">AtomicObject</span></code> only supports up to 65535 locales, and also works on
+the assumption that only the lowest 48 bits of the virtual address space will ever
+be used. An exascale solution that allows for an arbitrary number of compute nodes
+and for the entire 64-bit address space to be utilized is future work that is in-progress.</p>
+</div>
+</div>
+<div class="section" id="aba-wrapper">
+<h2>ABA Wrapper<a class="headerlink" href="#aba-wrapper" title="Permalink to this headline">¶</a></h2>
+<p>The &#8216;ABA&#8217; problem occurs when a task <em>T1</em> reads the value <em>A</em> from location <em>L</em>,
+another task <em>T2</em> writes <em>B</em> to <em>L</em>, and another task <em>T3</em> writes the value <em>A</em> to <em>L</em>;
+once <em>T1</em> checks to see if <em>L</em> has changed, it will incorrectly assume that it has not.
+To make this more concrete, think of <em>A</em> and <em>B</em> both as a node in a linked list;
+<em>T1</em> reads <em>A</em>, <em>T2</em> allocates a new node <em>B</em> and writes it to <em>L</em> and deletes <em>A</em>,
+and <em>T3</em> allocates a new node which just so happens to be the same piece of memory that
+<em>A</em> had before and writes it to <em>L</em>. Atomic operations such the <code class="docutils literal"><span class="pre">compareExchange</span></code>
+will succeed despite the fact that the nodes are not the same as it will perform
+the operation based on the virtual address.</p>
+<p>The <code class="docutils literal"><span class="pre">ABA</span></code> wrapper is one solution to this problem by coupling a 64-bit count alongside
+the normal 64-bit virtual address or the 48-bits of virtual address and 16-bit locality
+information. <code class="docutils literal"><span class="pre">AtomicObject</span></code> has its own ABA variants of its API, which can both take and return
+<code class="docutils literal"><span class="pre">ABA</span></code> wrappers. Examples of how they can be used can be observed below. It is safe to
+mix-and-match both ABA and non-ABA variants of the API, but only the ABA variants will advance
+the ABA counter.</p>
+<div class="highlight-chpl"><div class="highlight"><pre><span></span><span class="kd">var</span> <span class="nx">atomicVar</span> <span class="p">:</span> <span class="nx">AtomicObject</span><span class="p">(</span><span class="k">unmanaged</span> <span class="nx">Obj</span><span class="p">,</span> <span class="nx">hasABASupport</span><span class="o">=</span><span class="kc">true</span><span class="p">);</span>
+<span class="kd">var</span> <span class="nx">obj1</span> <span class="o">=</span> <span class="k">new</span> <span class="k">unmanaged</span> <span class="nx">Obj</span><span class="p">();</span>
+<span class="kd">var</span> <span class="nx">obj2</span> <span class="o">=</span> <span class="k">new</span> <span class="k">unmanaged</span> <span class="nx">Obj</span><span class="p">();</span>
+<span class="nx">atomicVar</span><span class="p">.</span><span class="nx">write</span><span class="p">(</span><span class="nx">obj1</span><span class="p">);</span>
+<span class="kd">var</span> <span class="nx">a</span> <span class="o">=</span> <span class="nx">atomicVar</span><span class="p">.</span><span class="nx">readABA</span><span class="p">();</span>
+<span class="kd">var</span> <span class="nx">b</span> <span class="o">=</span> <span class="nx">atomicVar</span><span class="p">.</span><span class="nx">writeABA</span><span class="p">(</span><span class="nx">obj2</span><span class="p">);</span>
+<span class="nx">atomicVar</span><span class="p">.</span><span class="nx">writeABA</span><span class="p">(</span><span class="nx">obj1</span><span class="p">);</span>
+<span class="nx">assert</span><span class="p">(</span><span class="nx">atomicVar</span><span class="p">.</span><span class="nx">compareExchange</span><span class="p">(</span><span class="nx">obj1</span><span class="p">,</span> <span class="nx">obj2</span><span class="p">)</span> <span class="o">==</span> <span class="kc">false</span><span class="p">,</span> <span class="s">&quot;This should always fail!&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">We <code class="docutils literal"><span class="pre">forward</span></code> all accesses to the <code class="docutils literal"><span class="pre">ABA</span></code> wrapper to the object it is wrapping
+so that whether or not the ABA versions of the <code class="docutils literal"><span class="pre">AtomicObject</span></code> API is used, it
+becomes as transparent as possible. This applies to all method and field accesses.
+As forwarding does not apply to operators, common operators are explicitly defined
+in such a way that they will also be forwarded to the object being wrapped.</p>
+</div>
+<dl class="record">
+<dt id="AtomicObjects.ABA">
+<em class="property">record </em><code class="descname">ABA</code><a class="headerlink" href="#AtomicObjects.ABA" title="Permalink to this definition">¶</a></dt>
+<dd><p>Wrapper for an object protected by an ABA counter. This type forwards to the object
+represented by its underlying pointer and hence can be used as if it were the object
+itself, via &#8216;forwarding&#8217;. This type should not be created by the user, and instead
+should be created by LocalAtomicObject. The object protected by this ABA wrapper can
+be extracted via &#8216;getObject&#8217;.</p>
+<dl class="attribute">
+<dt id="AtomicObjects.ABA.__ABA_objType">
+<em class="property">type </em><code class="descname">__ABA_objType</code><a class="headerlink" href="#AtomicObjects.ABA.__ABA_objType" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.ABA.init">
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>type __ABA_objType</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.ABA.init" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.ABA.init=">
+<em class="property">proc </em><code class="descname">init=</code><span class="sig-paren">(</span><em>other: ABA(?objType)</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.ABA.init=" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.ABA.getObject">
+<em class="property">proc </em><code class="descname">getObject</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.ABA.getObject" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.ABA.getABACount">
+<em class="property">proc </em><code class="descname">getABACount</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.ABA.getABACount" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.ABA.readWriteThis">
+<em class="property">proc </em><code class="descname">readWriteThis</code><span class="sig-paren">(</span><em>f</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.ABA.readWriteThis" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.==">
+<em class="property">proc </em><code class="descname">==</code><span class="sig-paren">(</span><em>const ref aba1: ABA</em>, <em>const ref aba2: ABA</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.==" title="Permalink to this definition">¶</a></dt>
+<dd><p>Special case operator that compares two <code class="docutils literal"><span class="pre">ABA</span></code> wrappers.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.!=">
+<em class="property">proc </em><code class="descname">!=</code><span class="sig-paren">(</span><em>const ref aba1: ABA</em>, <em>const ref aba2: ABA</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.!=" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt>
+<em class="property">proc </em><code class="descname">==</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt>
+<em class="property">proc </em><code class="descname">!=</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.&gt;">
+<em class="property">proc </em><code class="descname">&gt;</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.>" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.&gt;=">
+<em class="property">proc </em><code class="descname">&gt;=</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.>=" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.&lt;">
+<em class="property">proc </em><code class="descname">&lt;</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.<" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.&lt;=">
+<em class="property">proc </em><code class="descname">&lt;=</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.<=" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.+">
+<em class="property">proc </em><code class="descname">+</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.+" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.-">
+<em class="property">proc </em><code class="descname">-</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.-" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.*">
+<em class="property">proc </em><code class="descname">*</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.*" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects./">
+<em class="property">proc </em><code class="descname">/</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects./" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.+=">
+<em class="property">proc </em><code class="descname">+=</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.+=" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.-=">
+<em class="property">proc </em><code class="descname">-=</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.-=" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.*=">
+<em class="property">proc </em><code class="descname">*=</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.*=" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects./=">
+<em class="property">proc </em><code class="descname">/=</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects./=" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descname">proc ^(const ref aba: ABA, other)</code></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descname">proc |(const ref aba: ABA, other)</code></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descname">proc ^=(const ref aba: ABA, other)</code></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt>
+<code class="descname">proc |=(const ref aba: ABA, other)</code></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.&lt;&lt;">
+<em class="property">proc </em><code class="descname">&lt;&lt;</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.<<" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.&gt;&gt;">
+<em class="property">proc </em><code class="descname">&gt;&gt;</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.>>" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.&lt;&lt;=">
+<em class="property">proc </em><code class="descname">&lt;&lt;=</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.<<=" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="AtomicObjects.&gt;&gt;=">
+<em class="property">proc </em><code class="descname">&gt;&gt;=</code><span class="sig-paren">(</span><em>const ref aba: ABA</em>, <em>other</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.>>=" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="record">
+<dt id="AtomicObjects.AtomicObject">
+<em class="property">record </em><code class="descname">AtomicObject</code><a class="headerlink" href="#AtomicObjects.AtomicObject" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="attribute">
+<dt id="AtomicObjects.AtomicObject.objType">
+<em class="property">type </em><code class="descname">objType</code><a class="headerlink" href="#AtomicObjects.AtomicObject.objType" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="AtomicObjects.AtomicObject.hasABASupport">
+<em class="property">param </em><code class="descname">hasABASupport</code>: bool<a class="headerlink" href="#AtomicObjects.AtomicObject.hasABASupport" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="AtomicObjects.AtomicObject.hasGlobalSupport">
+<em class="property">param </em><code class="descname">hasGlobalSupport</code>: bool<a class="headerlink" href="#AtomicObjects.AtomicObject.hasGlobalSupport" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="AtomicObjects.AtomicObject.atomicVar">
+<em class="property">var </em><code class="descname">atomicVar</code>: AppendExpr.01<a class="headerlink" href="#AtomicObjects.AtomicObject.atomicVar" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.AtomicObject.init">
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>type objType</em>, <em>param hasABASupport = false</em>, <em>param hasGlobalSupport = !_local</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.AtomicObject.init" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt>
+<em class="property">proc </em><code class="descname">init</code><span class="sig-paren">(</span><em>type objType</em>, <em>defaultValue: objType</em>, <em>param hasABASupport = false</em>, <em>param hasGlobalSupport = !_local</em><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.AtomicObject.readABA">
+<em class="property">proc </em><code class="descname">readABA</code><span class="sig-paren">(</span><span class="sig-paren">)</span>: ABA(objType)<a class="headerlink" href="#AtomicObjects.AtomicObject.readABA" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.AtomicObject.read">
+<em class="property">proc </em><code class="descname">read</code><span class="sig-paren">(</span><span class="sig-paren">)</span>: objType<a class="headerlink" href="#AtomicObjects.AtomicObject.read" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.AtomicObject.compareExchange">
+<em class="property">proc </em><code class="descname">compareExchange</code><span class="sig-paren">(</span><em>expectedObj: objType</em>, <em>newObj: objType</em><span class="sig-paren">)</span>: bool<a class="headerlink" href="#AtomicObjects.AtomicObject.compareExchange" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.AtomicObject.compareExchangeABA">
+<em class="property">proc </em><code class="descname">compareExchangeABA</code><span class="sig-paren">(</span><em>expectedObj: ABA(objType)</em>, <em>newObj: objType</em><span class="sig-paren">)</span>: bool<a class="headerlink" href="#AtomicObjects.AtomicObject.compareExchangeABA" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt>
+<em class="property">proc </em><code class="descname">compareExchangeABA</code><span class="sig-paren">(</span><em>expectedObj: ABA(objType)</em>, <em>newObj: ABA(objType)</em><span class="sig-paren">)</span>: bool</dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.AtomicObject.write">
+<em class="property">proc </em><code class="descname">write</code><span class="sig-paren">(</span><em>newObj: objType</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.AtomicObject.write" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt>
+<em class="property">proc </em><code class="descname">write</code><span class="sig-paren">(</span><em>newObj: ABA(objType)</em><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.AtomicObject.writeABA">
+<em class="property">proc </em><code class="descname">writeABA</code><span class="sig-paren">(</span><em>newObj: ABA(objType)</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.AtomicObject.writeABA" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt>
+<em class="property">proc </em><code class="descname">writeABA</code><span class="sig-paren">(</span><em>newObj: objType</em><span class="sig-paren">)</span></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.AtomicObject.exchange">
+<em class="property">proc </em><code class="descname">exchange</code><span class="sig-paren">(</span><em>newObj: objType</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.AtomicObject.exchange" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.AtomicObject.exchangeABA">
+<em class="property">proc </em><code class="descname">exchangeABA</code><span class="sig-paren">(</span><em>newObj: objType</em><span class="sig-paren">)</span>: ABA(objType)<a class="headerlink" href="#AtomicObjects.AtomicObject.exchangeABA" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt>
+<em class="property">proc </em><code class="descname">exchangeABA</code><span class="sig-paren">(</span><em>newObj: ABA(objType)</em><span class="sig-paren">)</span>: ABA(objType)</dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="AtomicObjects.AtomicObject.readWriteThis">
+<em class="property">proc </em><code class="descname">readWriteThis</code><span class="sig-paren">(</span><em>f</em><span class="sig-paren">)</span><a class="headerlink" href="#AtomicObjects.AtomicObject.readWriteThis" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="EpochManager.html" class="btn btn-neutral float-right" title="EpochManager" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="../../index.html" class="btn btn-neutral" title="chpldoc documentation" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, .
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../../',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="../../_static/jquery.js"></script>
+      <script type="text/javascript" src="../../_static/underscore.js"></script>
+      <script type="text/javascript" src="../../_static/doctools.js"></script>
+      <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+  
+ 
+
+
+
+</body>
+</html>
