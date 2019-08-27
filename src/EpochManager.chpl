@@ -19,96 +19,105 @@
 
 /*
 
-To use the :class:`LocalEpochManager`, first create an instance.
+  Epoch-Based Memory Reclamation
+  ------------------------------
 
-.. code-block:: chapel
+  In Epoch-Based Memory Reclamation, the lifetime of an arbirary number
+  of objects are represented in terms of an *epoch*. While inside of an epoch,
+  there is a guarantee that no object that is reachable will be reclaimed. To
+  ensure this guarantee, objects are marked for deletion first prior to actually
+  deleting them by inserting them into a data structure specific to the current epoch.
+  Objects, prior to deletion, must be *logically removed* such that no future operations
+  are able to access them. One example of logical removal is removing a node from a linked
+  list by a task; the node is no longer accessible by other tasks after its removal, but
+  any other task could have access to said node *before* it was removed. To further concretize
+  this example by applying epochs, imagine that all tasks are in epoch *e*, a node *n* is logically
+  removed and therefore pushed on *e*'s data structure, then the epoch is advanced to *e'*,
+  then *n* can be safely deleted once no task is in *e*. 
 
- var manager = new LocalEpochManager();
+  .. note::
+
+    The correctness of Epoch-Based Memory Reclamation is contingent on the fact that
+    ``delete`` is never explicitly called on an object accessible during an epoch,
+    and that all deletion is handled through the ``EpochManager`` API.
+
+  There are two variants of the EpochManager, the ``LocalEpochManager``, which is optimized
+  for shared-memory, and the ``EpochManager``, which is optimized for disributed memory.
+  The ``LocalEpochManager`` is a shared-memory variant that is implemented entirely as
+  a class that enables the user to specify their own lifetime management as you would with
+  any other class. The ``EpochManager`` on the other hand, is a ``record`` that is 
+  ``forwarding`` to a privatized class instance, which ensures that all field accesses
+  and method invocations are forwarded to the an instance that is local to the current locale.
+  The ``EpochManager`` and ``LocalEpochManager`` share the same API and semantics in all but
+  one case: deallocation. Since ``EpochManager`` is a ``record``, you must explicitly invoke
+  ``destroy`` on it, as it will not automatically clean itself up when it goes out of scope.
+
+  .. code-block:: chpl
+
+    var localManager = new owned LocalEpochManager();
+    var distManager = new EpochManager();
+    // Necessary
+    distManager.destroy();  
+
+  For a task to enter an epoch, they must first ``register`` their task with the manager.
+  Once registered, a *token* specific to that task is returned, which will automatically unregister
+  the task after it goes out of scope via ``owned`` lifetime semantics.
+
+  .. code-block:: chpl
+
+    var manager = new owned EpochManager();
+    var token = manager.register();
+    // Optional
+    token.unregister();
+    forall i in 1..N with (var token = manager.register()) {}
+    manager.destroy();
+
+  After registering, the task must then ``pin`` to enter the current epoch, and ``unpin``
+  once they are finished. This token can also be used to mark objects for reclamation
+  via ``deferDelete``. The ``EpochManager`` takes any type of ``unmanaged`` class and treats
+  them as ``object``, so no generics are required.
+
+  .. code-block:: chpl
+
+    forall i in 1..N with (var token = manager.register()) {
+      token.pin();          
+      token.deferDelete(new unmanged object());
+      token.unpin();  
+    }  
 
 
-Registering a Task
-------------------
-A task must be registered with the manager in order to use the manager.
-Registration returns a token that is used when a task inters or exits a critical section.
+  To advance the epoch and ensure that objects can be reclaimed, ``tryReclaim`` must
+  be invoked, and should be done so periodically. ``tryReclaim`` is concurrent-safe to
+  call, and so can be called from the context of multiple tasks.
 
-.. code-block:: chapel
+  .. code-block:: chpl
 
- var tok = manager.register();
+    var dom = {1..N} dmapped Cyclic(startIdx=1);
+    var manager = new EpochManager();
+    forall i in dom with (var token = manager.register(), var numOps : int) {
+      token.pin();
+      // ...
+      token.unpin();
+      numOps += 1;
+      if numOps % 1024 == 0 then {
+        manager.tryReclaim();
+      }
+    }
+    manager.tryReclaim();
+    manager.destroy();
 
-
-Pinning/Unpinning a Task
-------------------------
-To avoid reclamation while a task is accessing a resource, I.E. to enter
-critical section, a task must `pin`. Correspondingly to exit critical section,
-the task must `unpin`.
-
-.. code-block:: chapel
-
- // Enter critical section
- tok.pin();
- // Do something
-
- // Exit critical section
- tok.unpin();
-
-
-Deleting an object
-------------------
-To `delete` an object:
-
-.. code-block:: chapel
-
- tok.deferDelete(myObj);
-
-
-.. note::
- A task must be `pinned` to `delete` an object. The manager can only be used to
- delete ``unmanaged`` objects.
-
-
-Reclaiming deleted objects
---------------------------
-To try to reclaim memory:
-
-.. code-block:: chapel
-
- tok.tryReclaim();
-
-
-.. note::
- Alternatively, a task may call ``manager.tryReclaim()``.
-
-
-Unregister a Task
------------------
-In the end, a registered task needs to `unregister` from the manager. The
-registration token is a scoped variable, and hence the ending of the scope in
-which the task registered wiill automatically `unregister` the task.
-`unregister` can also be performed manually:
-
-.. code-block:: chapel
-
- tok.unregister();
-
-Destroy
--------
-To destroy the manager, and reclaim all the memory managed by the manager:
-
-.. code-block:: chapel
-
- delete manager;
 */
-module EpochManager {
+prototype module EpochManager {
 
   pragma "no doc"
-  module LockFreeLinkedListModule {
+  prototype module LockFreeLinkedListModule {
 
     use AtomicObjects;
 
     class Node {
       type eltType;
-      var val : eltType;
-      var next : unmanaged Node(eltType);
+      var val : eltType?;
+      var next : unmanaged Node(eltType?)?;
 
       proc init(val : ?eltType) {
         this.eltType = eltType;
@@ -122,13 +131,17 @@ module EpochManager {
 
     class LockFreeLinkedList {
       type objType;
-      var _head : AtomicObject(unmanaged Node(objType), hasABASupport=true, hasGlobalSupport=true);
+
+      // Currently, ``hasGlobalSupport=true`` is necessary when using it from multiple locales, even
+      // if it is intended to be used locally. This is due to there being no compiler primitive to create
+      // a 'wide' class, nor a way to cast a wide-pointer to create a wide class.
+      var _head : AtomicObject(unmanaged Node(objType?)?, hasABASupport=true, hasGlobalSupport=true);
 
       proc init(type objType) {
         this.objType = objType;
       }
 
-      proc append(newObj : objType) {
+      proc append(newObj : objType?) {
         var _node = new unmanaged Node(newObj);
         do {
           var oldHead = _head.readABA();
@@ -136,7 +149,7 @@ module EpochManager {
         } while(!_head.compareExchangeABA(oldHead, _node));
       }
 
-      iter these() : objType {
+      iter these() : objType? {
         var ptr = _head.read();
         while (ptr != nil) {
           yield ptr.val;
@@ -147,7 +160,7 @@ module EpochManager {
       proc deinit() {
         var ptr = _head.read();
         while (ptr != nil) {
-          var next = ptr.next;
+          var next = ptr!.next;
           delete ptr;
           ptr = next;
         }
@@ -155,16 +168,17 @@ module EpochManager {
     }
   }
 
+  // Michael & Scott Queue: https://www.cs.rochester.edu/u/scott/papers/1996_PODC_queues.pdf
   pragma "no doc"
-  module LockFreeQueueModule {
+  prototype module LockFreeQueueModule {
 
     use AtomicObjects;
 
     class Node {
       type eltType;
-      var val : eltType;
-      var next : AtomicObject(unmanaged Node(eltType), hasABASupport=true, hasGlobalSupport=true);
-      var freeListNext : unmanaged Node(eltType);
+      var val : eltType?;
+      var next : AtomicObject(unmanaged Node(eltType?)?, hasABASupport=true, hasGlobalSupport=true);
+      var freeListNext : unmanaged Node(eltType?)?;
 
       proc init(val : ?eltType) {
         this.eltType = eltType;
@@ -178,46 +192,37 @@ module EpochManager {
 
     class LockFreeQueue {
       type objType;
-      var _head : AtomicObject(unmanaged Node(objType), hasABASupport=true, hasGlobalSupport=true);
-      var _tail : AtomicObject(unmanaged Node(objType), hasABASupport=true, hasGlobalSupport=true);
-      var _freeListHead : AtomicObject(unmanaged Node(objType), hasABASupport=true, hasGlobalSupport=true);
+      // Head and Tail can never be nil in Michael & Scott Queue
+      var _head : AtomicObject(unmanaged Node(objType?), hasABASupport=true, hasGlobalSupport=true);
+      var _tail : AtomicObject(unmanaged Node(objType?), hasABASupport=true, hasGlobalSupport=true);
+      var _freeListHead : AtomicObject(unmanaged Node(objType?)?, hasABASupport=true, hasGlobalSupport=true);
       // Flag to set if objects held in the queue are to be deleted or not.
       // By default initialised to true.
       const delete_val : bool;
 
-      proc init(type objType) {
-        this.objType = objType;
-        delete_val = true;
-        this.complete();
-        var _node = new unmanaged Node(objType);
-        _head.write(_node);
-        _tail.write(_node);
-      }
-
-      proc init(type objType, delete_val : bool) {
+      proc init(type objType, delete_val : bool = true) {
         this.objType = objType;
         this.delete_val = delete_val;
         this.complete();
-        var _node = new unmanaged Node(objType);
+        var _node = new unmanaged Node(objType?);
         _head.write(_node);
         _tail.write(_node);
       }
 
-      proc recycleNode() : unmanaged Node(objType) {
-        var oldTop : ABA(unmanaged Node(objType));
-        var n : unmanaged Node(objType);
+      proc recycleNode() : unmanaged Node(objType?) {
+        var oldTop : ABA(unmanaged Node(objType?)?);
+        var n : unmanaged Node(objType?)?;
         do {
           oldTop = _freeListHead.readABA();
           n = oldTop.getObject();
           if (n == nil) {
-            n = new unmanaged Node(objType);
-            return n;
+            return new unmanaged Node(objType?);
           }
-          var newTop = n.freeListNext;
+          var newTop = n!.freeListNext;
         } while (!_freeListHead.compareExchangeABA(oldTop, newTop));
-        n.next.write(nil);
-        n.freeListNext = nil;
-        return n;
+        n!.next.write(nil);
+        n!.freeListNext = nil;
+        return n!;
       }
 
       proc enqueue(newObj : objType) {
@@ -230,9 +235,13 @@ module EpochManager {
           var next = tail.next.readABA();
           var next_node = next.getObject();
           var curr_tail = _tail.readABA();
+
+          // Check if tail and next are consistent
           if (tail == curr_tail) {
             if (next_node == nil) {
               if (curr_tail.next.compareExchangeABA(next, n)) {
+
+                // Enqueue is done. Try to swing Tail to the inserted node
                 _tail.compareExchangeABA(curr_tail, n);
                 break;
               }
@@ -244,7 +253,7 @@ module EpochManager {
         }
       }
 
-      proc dequeue() : objType {
+      proc dequeue() : objType? {
         while (true) {
           var head = _head.readABA();
           var head_node = head.getObject();
@@ -261,9 +270,9 @@ module EpochManager {
               _tail.compareExchangeABA(curr_tail, next_node);
             }
             else {
-              var ret_val = next_node.val;
+              var ret_val = next_node!.val;
               if (_head.compareExchangeABA(curr_head, next_node)) {
-                retireNode(head_node);
+                retireNode(head_node!);
                 return ret_val;
               }
             }
@@ -274,7 +283,7 @@ module EpochManager {
       }
 
       // TODO: Reclaim retired nodes after a while
-      proc retireNode(nextObj : unmanaged Node(objType)) {
+      proc retireNode(nextObj : unmanaged Node(objType?)) {
         nextObj.val = nil;
         do {
           var oldTop = _freeListHead.readABA();
@@ -299,24 +308,16 @@ module EpochManager {
 
       proc deinit() {
         var ptr = _head.read();
-        if (delete_val) {
-          while (ptr != nil) {
-            _head = ptr.next;
-            delete ptr.val;
-            delete ptr;
-            ptr = _head.read();
-          }
-        } else {
-          while (ptr != nil) {
-            _head = ptr.next;
-            delete ptr;
-            ptr = _head.read();
-          }
+        while (ptr != nil) {
+          var tmp = ptr!.next.read();
+          if delete_val then delete ptr!.val;
+          delete ptr;
+          ptr = tmp;
         }
 
         ptr = _freeListHead.read();
         while (ptr != nil) {
-          var head = ptr.freeListNext;
+          var head = ptr!.freeListNext;
           delete ptr;
           ptr = head;
         }
@@ -324,44 +325,49 @@ module EpochManager {
     }
   }
 
+
   pragma "no doc"
-  module LimboListModule {
+  // The LimboList is a linked list that is optimized for insertion and bulk removal.
+  // Atomic exchanges are entirely wait-free and are at least an order of magnitude faster
+  // than compare-exchange based one. This data structure supports a multi-producer but
+  // single and non-concurrent consumer, which is ideal for when we reclaim from the limbo
+  // list when no other task has access to said limbo list.
+  prototype module LimboListModule {
 
     use AtomicObjects;
 
     class Node {
-      var val : unmanaged object;
-      var next : unmanaged Node;
+      var val : unmanaged object?;
+      var next : unmanaged Node?;
 
-      proc init(val : unmanaged object) {
+      proc init(val : unmanaged object?) {
         this.val = val;
       }
     }
 
     class LimboList {
-      var _head : AtomicObject(unmanaged Node, hasABASupport=true, hasGlobalSupport=true);
-      var _freeListHead : AtomicObject(unmanaged Node, hasABASupport=true, hasGlobalSupport=true);
+      var _head : AtomicObject(unmanaged Node?, hasABASupport=true, hasGlobalSupport=true);
+      var _freeListHead : AtomicObject(unmanaged Node?, hasABASupport=true, hasGlobalSupport=true);
 
-      proc push(obj : unmanaged object) {
+      proc push(obj : unmanaged object?) {
         var node = recycleNode(obj);
         var oldHead = _head.exchange(node);
         node.next = oldHead;
       }
 
-      proc recycleNode(obj : unmanaged object) : unmanaged Node {
-        var oldTop : ABA(unmanaged Node);
-        var n : unmanaged Node;
+      proc recycleNode(obj : unmanaged object?) : unmanaged Node {
+        var oldTop : ABA(unmanaged Node?);
+        var n : unmanaged Node?;
         do {
           oldTop = _freeListHead.readABA();
           n = oldTop.getObject();
           if (n == nil) {
-            n = new unmanaged Node(obj);
-            return n;
+            return new unmanaged Node(obj);
           }
           var newTop = n.next;
         } while (!_freeListHead.compareExchangeABA(oldTop, newTop));
         n.val = obj;
-        return n;
+        return n!;
       }
 
       proc retireNode(nextObj : unmanaged Node) {
@@ -379,8 +385,8 @@ module EpochManager {
       proc deinit() {
         var ptr = _head.read();
         while (ptr != nil) {
-          var next = ptr.next;
-          delete ptr.val;
+          var next = ptr!.next;
+          delete ptr!.val;
           delete ptr;
           ptr = next;
         }
@@ -389,7 +395,7 @@ module EpochManager {
   }
 
   pragma "no doc"
-  module VectorModule {
+  prototype module VectorModule {
     /**
      * Obtained from https://github.com/pnnl/chgl/blob/master/src/Vectors.chpl
      */
@@ -510,6 +516,7 @@ module EpochManager {
     pragma "no doc"
     const EBR_EPOCHS : uint = 3;
 
+    // An inactive task has local_epoch set to 0
     pragma "no doc"
     const INACTIVE : uint = 0;
 
@@ -548,7 +555,7 @@ module EpochManager {
         free_list.enqueue(tok);
       }
       global_epoch.write(1);
-      forall i in 1..EBR_EPOCHS do
+      for i in 1..EBR_EPOCHS do
         limbo_list[i] = new unmanaged LimboList();
     }
 
@@ -557,7 +564,7 @@ module EpochManager {
 
       :returns: A handle to the manager
     */
-    proc register() : owned TokenWrapper { // Should be called only once
+    proc register() : owned TokenWrapper {
       var tok = free_list.dequeue();
       if (tok == nil) {
         tok = new unmanaged _token();
@@ -565,18 +572,19 @@ module EpochManager {
       }
       tok.is_registered.write(true);
       // return tok;
-      return new owned TokenWrapper(tok, this:unmanaged);
+      return new owned TokenWrapper(tok!, this:unmanaged);
     }
 
     pragma "no doc"
     proc unregister(tok: unmanaged _token) {
       if (tok.is_registered.read()) {
         unpin(tok);
-        free_list.enqueue(tok);
         tok.is_registered.write(false);
+        free_list.enqueue(tok);
       }
     }
 
+    // TODO: Add support for recursive `pin`/`unpin`
     pragma "no doc"
     proc pin(tok: unmanaged _token) {
       // An inactive task has local_epoch set to 0. A value other than 0
@@ -590,13 +598,14 @@ module EpochManager {
       tok.local_epoch.write(INACTIVE);
     }
 
-    // Attempt to announce a new epoch
+    // Attempt to announce a new epoch. A new epoch is announced if all
+    // active tasks are on the current global epoch
     pragma "no doc"
     proc tryAdvance() : uint {
       var epoch = global_epoch.read();
       for tok in allocated_list {
         var local_epoch = tok.local_epoch.read();
-        if (local_epoch > 0 && local_epoch != epoch) then
+        if (local_epoch != INACTIVE && local_epoch != epoch) then
           return 0;
       }
 
@@ -614,7 +623,7 @@ module EpochManager {
     }
 
     pragma "no doc"
-    proc deferDelete(tok : unmanaged _token, x : unmanaged object) {
+    proc deferDelete(tok : unmanaged _token, x : unmanaged object?) {
       var del_epoch = tok.local_epoch.read();
       if (del_epoch == 0) {
         writeln("Bad local epoch! Please pin! Using global epoch!");
@@ -625,14 +634,15 @@ module EpochManager {
 
     /*
       Try to announce a new epoch. If successful, reclaim objects which are
-      safe to reclaim
+      safe to reclaim. It is legal to call it in or outside of a read-side
+      critical section (while the task is pinned).
     */
     proc tryReclaim() {
       var count = EBR_EPOCHS;
 
       // if nothing to reclaim, try the next epoch, but loop only for one
       // full cycle
-      while (count) {
+      while count != 0 {
         count = count - 1;
 
         // Set a flag to let other tasks know that a task is already
@@ -654,7 +664,7 @@ module EpochManager {
         while (head != nil) {
           var next = head.next;
           delete head.val;
-          reclaim_limbo_list.retireNode(head);
+          reclaim_limbo_list.retireNode(head!);
           head = next;
         }
       }
@@ -685,7 +695,7 @@ module EpochManager {
   class TokenWrapper {
 
     pragma "no doc"
-    var _tok : unmanaged _token;
+    var _tok : unmanaged _token?;
 
     pragma "no doc"
     var manager : unmanaged LocalEpochManager;
@@ -700,14 +710,14 @@ module EpochManager {
       `Pin` a task
     */
     proc pin() {
-      manager.pin(this._tok);
+      manager.pin(this._tok!);
     }
 
     /*
       `Unpin` a task
     */
     proc unpin() {
-      manager.unpin(this._tok);
+      manager.unpin(this._tok!);
     }
 
     /*
@@ -715,8 +725,8 @@ module EpochManager {
 
       :arg x: The class instance to be deleted. Must be of unmanaged class type
     */
-    proc deferDelete(x) {
-      manager.deferDelete(this._tok, x);
+    proc deferDelete(x : unmanaged object?) {
+      manager.deferDelete(this._tok!, x);
     }
 
     /*
@@ -731,7 +741,7 @@ module EpochManager {
       Unregister the handle from the manager
     */
     proc unregister() {
-      manager.unregister(this._tok);
+      manager.unregister(this._tok!);
       this._tok = nil;
     }
 
@@ -807,6 +817,8 @@ module EpochManager {
     pragma "no doc"
     var is_setting_epoch : atomic bool;
 
+
+    // TODO: May need to set these to nil-able?
     //  List of all tokens on current locale
     pragma "no doc"
     var allocated_list : unmanaged LockFreeLinkedList(unmanaged _token);
@@ -828,46 +840,41 @@ module EpochManager {
     pragma "no doc"
     proc init() {
       this.global_epoch = new unmanaged GlobalEpoch(1:uint);
-      allocated_list = new unmanaged LockFreeLinkedList(unmanaged _token);
-      free_list = new unmanaged LockFreeQueue(unmanaged _token, false);
+      this.allocated_list = new unmanaged LockFreeLinkedList(unmanaged _token);
+      this.free_list = new unmanaged LockFreeQueue(unmanaged _token, false);
       this.complete();
       this.pid = _newPrivatizedClass(this);
 
-      // Initialise the free list pool with here.maxTaskPar tokens
-      forall i in 0..#here.maxTaskPar {
-        var tok = new unmanaged _token();
-        allocated_list.append(tok);
-        free_list.enqueue(tok);
-      }
-      locale_epoch.write(global_epoch.read());
-      forall i in 1..EBR_EPOCHS do
-        limbo_list[i] = new unmanaged LimboList();
-
-      forall i in LocaleSpace do
-        objsToDelete[i] = new unmanaged Vector(unmanaged object);
+      this.initializeMembers();
     }
 
 
     //  Initializer for slave locales
     pragma "no doc"
     proc init(other, privatizedData, global_epoch) {
-      allocated_list = new unmanaged LockFreeLinkedList(unmanaged _token);
-      free_list = new unmanaged LockFreeQueue(unmanaged _token, false);
-      this.complete();
       this.global_epoch = global_epoch;
+      this.allocated_list = new unmanaged LockFreeLinkedList(unmanaged _token);
+      this.free_list = new unmanaged LockFreeQueue(unmanaged _token, false);
+      this.complete();
 
-      // Initialise the free list pool with here.maxTaskPar tokens
+      this.initializeMembers();
+      this.pid = privatizedData;
+    }
+
+    // Initialise the free list pool with here.maxTaskPar tokens and other members
+    pragma "no doc"
+    proc initializeMembers() {
       forall i in 0..#here.maxTaskPar {
         var tok = new unmanaged _token();
-        allocated_list.append(tok);
-        free_list.enqueue(tok);
+        this.allocated_list.append(tok);
+        this.free_list.enqueue(tok);
       }
-      locale_epoch.write(global_epoch.read());
+      this.locale_epoch.write(global_epoch.read());
       forall i in 1..EBR_EPOCHS do
-        limbo_list[i] = new unmanaged LimboList();
+        this.limbo_list[i] = new unmanaged LimboList();
+
       forall i in LocaleSpace do
-        objsToDelete[i] = new unmanaged Vector(unmanaged object);
-      this.pid = privatizedData;
+        this.objsToDelete[i] = new unmanaged Vector(unmanaged object);
     }
 
     pragma "no doc"
@@ -879,7 +886,7 @@ module EpochManager {
       delete objsToDelete;
 
       // Delete global data
-      if here == Locales[0] { // Is it necessary that global_epoch be on Locales[0]?
+      if here == Locales[0] { // TODO: Is it necessary that global_epoch be on Locales[0]?
         delete global_epoch;
       }
     }
@@ -889,7 +896,7 @@ module EpochManager {
 
       :returns: A handle to the manager
     */
-    proc register() : owned DistTokenWrapper { // owned DistTokenWrapper { // Should be called only once
+    proc register() : owned DistTokenWrapper {
       var tok = free_list.dequeue();
       if (tok == nil) {
         tok = new unmanaged _token();
@@ -897,7 +904,7 @@ module EpochManager {
       }
       tok.is_registered.write(true);
       // return tok;
-      return new owned DistTokenWrapper(tok, this:unmanaged);
+      return new owned DistTokenWrapper(tok!, this:unmanaged);
     }
 
     pragma "no doc"
@@ -920,23 +927,7 @@ module EpochManager {
     }
 
     pragma "no doc"
-    proc getMinimumEpoch() : uint {
-      if active_tasks.read() > 0 {
-        var minEpoch = max(uint);
-        for tok in allocated_list {
-          var local_epoch = tok.local_epoch.read();
-          if (local_epoch > 0) then
-            minEpoch = min(minEpoch, local_epoch);
-        }
-
-        if (minEpoch != max(uint)) then return minEpoch;
-      }
-
-      return 0;
-    }
-
-    pragma "no doc"
-    proc deferDelete(tok : unmanaged _token, x : unmanaged object) {
+    proc deferDelete(tok : unmanaged _token, x : unmanaged object?) {
       var del_epoch = tok.local_epoch.read();
       if (del_epoch == 0) {
         writeln("Bad local epoch! Please pin! Using global epoch!");
@@ -968,16 +959,24 @@ module EpochManager {
         return;
       };
 
-      var minEpoch = max(uint);
-      coforall loc in Locales with (min reduce minEpoch) do on loc {
-        var _this = getPrivatizedInstance();
-        var localeMinEpoch = _this.getMinimumEpoch();
-        if localeMinEpoch != 0 then
-          minEpoch = min(minEpoch, localeMinEpoch);
-      }
+      // TODO: Right now we do not utilize all 3 epochs; in the future,
+      // I need to check how crossbeam does it and go from there.
       const current_global_epoch = global_epoch.read();
-
-      if minEpoch == current_global_epoch || minEpoch == max(uint) {
+      var safeToReclaim = true;
+      coforall loc in Locales with (&& reduce safeToReclaim) do on loc {
+        var _this = getPrivatizedInstance();
+        if _this.active_tasks.read() != 0 {
+          for tok in _this.allocated_list {
+            var local_epoch = tok.local_epoch.read();
+            if (local_epoch != 0 && local_epoch != current_global_epoch) {
+              safeToReclaim = false;
+              break;
+            } 
+          }
+        }
+      }
+      
+      if safeToReclaim {
         const new_epoch = (current_global_epoch % EBR_EPOCHS) + 1;
         global_epoch.write(new_epoch);
         coforall loc in Locales do on loc {
@@ -1037,7 +1036,7 @@ module EpochManager {
           while (head != nil) {
             var obj = head.val;
             var next = head.next;
-            _this.objsToDelete[obj.locale.id].append(obj);
+            _this.objsToDelete[obj.locale.id].append(obj!);
             delete head;
             head = next;
           }
@@ -1087,7 +1086,7 @@ module EpochManager {
   class DistTokenWrapper {
 
     pragma "no doc"
-    var _tok : unmanaged _token;
+    var _tok : unmanaged _token?;
 
     pragma "no doc"
     var manager : unmanaged EpochManagerImpl;
@@ -1102,14 +1101,14 @@ module EpochManager {
       `Pin` a task
     */
     proc pin() {
-      manager.pin(this._tok);
+      manager.pin(this._tok!);
     }
 
     /*
       `Unpin` a task
     */
     proc unpin() {
-      manager.unpin(this._tok);
+      manager.unpin(this._tok!);
     }
 
     /*
@@ -1117,8 +1116,8 @@ module EpochManager {
 
       :arg x: The class instance to be deleted. Must be of unmanaged class type
     */
-    proc deferDelete(x) {
-      manager.deferDelete(this._tok, x);
+    proc deferDelete(x:unmanaged object?) {
+      manager.deferDelete(this._tok!, x);
     }
 
     /*
@@ -1133,7 +1132,7 @@ module EpochManager {
       Unregister the handle from the manager
     */
     proc unregister() {
-      manager.unregister(this._tok);
+      manager.unregister(this._tok!);
       this._tok = nil;
     }
 

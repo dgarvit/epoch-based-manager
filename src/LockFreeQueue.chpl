@@ -90,15 +90,14 @@
       Simple, Fast, and Practical Non-Blocking and Blocking Concurrent Queue Algorithms. 
       No. TR-600. ROCHESTER UNIV NY DEPT OF COMPUTER SCIENCE, 1995.
 */
-module LockFreeQueue {
+prototype module LockFreeQueue {
   use EpochManager;
   use AtomicObjects;
 
-  pragma "no doc"
   class Node {
     type eltType;
-    var val : eltType;
-    var next : AtomicObject(unmanaged Node(eltType), hasGlobalSupport=false, hasABASupport=false);
+    var val : eltType?;
+    var next : AtomicObject(unmanaged Node(eltType)?, hasGlobalSupport=true, hasABASupport=false);
 
     proc init(val : ?eltType) {
       this.eltType = eltType;
@@ -111,22 +110,15 @@ module LockFreeQueue {
   }
 
   class LockFreeQueue {
-    pragma "no doc"
     type objType;
-
-    pragma "no doc"
-    var _head : AtomicObject(unmanaged Node(objType), hasGlobalSupport=false, hasABASupport=false);
-
-    pragma "no doc"
-    var _tail : AtomicObject(unmanaged Node(objType), hasGlobalSupport=false, hasABASupport=false);
-
-    pragma "no doc"
+    var _head : AtomicObject(unmanaged Node(objType?), hasGlobalSupport=true, hasABASupport=false);
+    var _tail : AtomicObject(unmanaged Node(objType?), hasGlobalSupport=true, hasABASupport=false);
     var _manager = new owned LocalEpochManager();
 
     proc init(type objType) {
       this.objType = objType;
       this.complete();
-      var _node = new unmanaged Node(objType);
+      var _node = new unmanaged Node(objType?);
       _head.write(_node);
       _tail.write(_node);
     }
@@ -135,7 +127,7 @@ module LockFreeQueue {
       return _manager.register();
     }
 
-    proc enqueue(newObj : objType, tok : owned TokenWrapper = getToken()) {
+    proc enqueue(newObj : objType?, tok : owned TokenWrapper = getToken()) {
       var n = new unmanaged Node(newObj);
       tok.pin();
       while (true) {
@@ -155,7 +147,7 @@ module LockFreeQueue {
       tok.unpin();
     }
 
-    proc dequeue(tok : owned TokenWrapper = getToken()) : (bool, objType) {
+    proc dequeue(tok : owned TokenWrapper = getToken()) : (bool, objType?) {
       tok.pin();
       while (true) {
         var curr_head = _head.read();
@@ -165,7 +157,7 @@ module LockFreeQueue {
         if (curr_head == curr_tail) {
           if (next_node == nil) {
             tok.unpin();
-            var retval : objType;
+            var retval : objType?;
             return (false, retval);
           }
           _tail.compareExchange(curr_tail, next_node);
@@ -182,11 +174,11 @@ module LockFreeQueue {
       }
 
       tok.unpin();
-      var retval : objType;
+      var retval : objType?;
       return (false, retval);
     }
 
-    iter drain() {
+    iter drain() : objType? {
       var tok = getToken();
       var (hasElt, elt) = dequeue(tok);
       while hasElt {
@@ -196,7 +188,7 @@ module LockFreeQueue {
       tryReclaim();
     }
 
-    iter drain(param tag : iterKind) where tag == iterKind.standalone {
+    iter drain(param tag : iterKind) : objType? where tag == iterKind.standalone {
       coforall tid in 1..here.maxTaskPar {
         var tok = getToken();
         var (hasElt, elt) = dequeue(tok);

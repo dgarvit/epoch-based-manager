@@ -91,15 +91,14 @@
       "A scalable lock-free stack algorithm." Proceedings of the sixteenth annual 
       ACM symposium on Parallelism in algorithms and architectures. ACM, 2004.
 */
-module LockFreeStack {
+prototype module LockFreeStack {
   use EpochManager;
   use AtomicObjects;
 
-  pragma "no doc"
   class Node {
     type eltType;
-    var val : eltType;
-    var next : unmanaged Node(eltType);
+    var val : eltType?;
+    var next : unmanaged Node(eltType?)?;
 
     proc init(val : ?eltType) {
       this.eltType = eltType;
@@ -112,13 +111,8 @@ module LockFreeStack {
   }
 
   class LockFreeStack {
-    pragma "no doc"
     type objType;
-
-    pragma "no doc"
-    var _top : AtomicObject(unmanaged Node(objType), hasGlobalSupport=false, hasABASupport=false);
-
-    pragma "no doc"
+    var _top : AtomicObject(unmanaged Node(objType?)?, hasGlobalSupport=true, hasABASupport=false);
     var _manager = new owned LocalEpochManager();
 
     proc init(type objType) {
@@ -132,16 +126,20 @@ module LockFreeStack {
     proc push(newObj : objType, tok : owned TokenWrapper = getToken()) {
       var n = new unmanaged Node(newObj);
       tok.pin();
+      var shouldYield = false;
       do {
         var oldTop = _top.read();
         n.next = oldTop;
+        if shouldYield then chpl_task_yield();
+        shouldYield = true;
       } while (!_top.compareExchange(oldTop, n));
       tok.unpin();
     }
 
     proc pop(tok : owned TokenWrapper = getToken()) : (bool, objType) {
-      var oldTop : unmanaged Node(objType);
+      var oldTop : unmanaged Node(objType?)?;
       tok.pin();
+      var shouldYield = false;
       do {
         oldTop = _top.read();
         if (oldTop == nil) {
@@ -150,6 +148,8 @@ module LockFreeStack {
           return (false, retval);
         }
         var newTop = oldTop.next;
+        if shouldYield then chpl_task_yield();
+        shouldYield = true;
       } while (!_top.compareExchange(oldTop, newTop));
       var retval = oldTop.val;
       tok.deferDelete(oldTop);
@@ -157,7 +157,7 @@ module LockFreeStack {
       return (true, retval);
     }
 
-    iter drain() {
+    iter drain() : objType? {
       var tok = getToken();
       var (hasElt, elt) = pop(tok);
       while hasElt {
@@ -167,7 +167,7 @@ module LockFreeStack {
       tryReclaim();
     }
 
-    iter drain(param tag : iterKind) where tag == iterKind.standalone {
+    iter drain(param tag : iterKind) : objType? where tag == iterKind.standalone {
       coforall tid in 1..here.maxTaskPar {
         var tok = getToken();
         var (hasElt, elt) = pop(tok);

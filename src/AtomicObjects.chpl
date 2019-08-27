@@ -56,6 +56,18 @@
     be used. An exascale solution that allows for an arbitrary number of compute nodes
     and for the entire 64-bit address space to be utilized is future work that is in-progress.
 
+  .. note::
+
+    When ``hasGlobalSupport=true`` and ``hasABASupport=false``, it will enable RDMA atomics,
+    I.E when ``CHPL_NETWORK_ATOMICS!="none"``, which is provides a significant improvement
+    in performance on systems where they are support, notable on a Cray-XC.
+
+  .. warning:: 
+
+    Currently, ``hasGlobalSupport=true`` is necessary when using it from multiple locales, even
+    if it is intended to be used locally. This is due to there being no compiler primitive to create
+    a 'wide' class, nor a way to cast a wide-pointer to create a wide class.
+
   ABA Wrapper
   -----------
 
@@ -92,13 +104,10 @@
     We ``forward`` all accesses to the ``ABA`` wrapper to the object it is wrapping 
     so that whether or not the ABA versions of the ``AtomicObject`` API is used, it
     becomes as transparent as possible. This applies to all method and field accesses.
-    As forwarding does not apply to operators, common operators are explicitly defined
-    in such a way that they will also be forwarded to the object being wrapped.
-
 
 
 */
-module AtomicObjects {
+prototype module AtomicObjects {
 
   if CHPL_TARGET_ARCH != "x86_64" {
     compilerWarning("The AtomicObjects package module cannot support CHPL_TARGET_ARCH=", CHPL_TARGET_ARCH, ", only x86_64 is supported.");
@@ -110,31 +119,44 @@ module AtomicObjects {
     #include <stdio.h>
     #include <stdlib.h>
 
-    struct uint128 {
+    typedef struct uint128 {
       uint64_t lo;
       uint64_t hi;
-    };
+    } uint128_t;
+
+    // src: Address of a 16-byte aligned address or else General Protection Fault (GPF)
+    // cmp: Expected value
+    // with: New value to replace old
+    // Returns: If successful or not
+    static inline int _cas128bit(uint128_t *src, uint128_t *cmp, uint128_t *with) {
+      char result;
+      __asm__ __volatile__ ("lock; cmpxchg16b (%6);"
+        "setz %7; "
+        : "=a" (cmp->lo),
+        "=d" (cmp->hi)
+        : "0" (cmp->lo),
+        "1" (cmp->hi),
+        "b" (with->lo),
+        "c" (with->hi),
+        "r" (src),
+        "m" (result)
+        : "cc", "memory"); 
+        return result;
+    }
 
     typedef struct uint128 uint128_t;
+
+    // srcvp: Address of a 16-byte aligned address or else General Protection Fault (GPF)
+    // cmpvp: Expected value
+    // withvp: New value to replace old
+    // Returns: If successful or not
     static inline int cas128bit(void *srcvp, void *cmpvp, void *withvp) {
       uint128_t __attribute__ ((aligned (16))) cmp_val = * (uint128_t *) cmpvp;
       uint128_t __attribute__ ((aligned (16))) with_val = * (uint128_t *) withvp;      
       uint128_t *src = srcvp;
       uint128_t *cmp = &cmp_val;
       uint128_t *with = &with_val;
-      char result;
-
-      __asm__ __volatile__ ("lock; cmpxchg16b (%6);"
-          "setz %7; "
-          : "=a" (cmp->lo),
-          "=d" (cmp->hi)
-          : "0" (cmp->lo),
-          "1" (cmp->hi),
-          "b" (with->lo),
-          "c" (with->hi),
-          "r" (src),
-          "m" (result)
-          : "cc", "memory");
+      char result = _cas128bit(src, cmp, with);
       *(uint128_t *) cmpvp = cmp_val;
       return result;
     }
@@ -145,101 +167,52 @@ module AtomicObjects {
       uint128_t *src = srcvp;
       uint128_t *cmp = &cmp_val;
       uint128_t *with = &with_val;
-      char successful = 0;
-
-      while (!successful) {
-        __asm__ __volatile__ ("lock; cmpxchg16b (%6);"
-            "setz %7; "
-            : "=a" (cmp->lo),
-            "=d" (cmp->hi)
-            : "0" (cmp->lo),
-            "1" (cmp->hi),
-            "b" (with->lo),
-            "c" (with->hi),
-            "r" (src),
-            "m" (successful)
-            : "cc", "memory");
-      }
+      while (!_cas128bit(src, cmp, with)) ;
     }
 
+    // Special-case which will update the ABA count of valvp to be
+    // one plus the srcvp. This is needed as ABA count needs to be monotonically
+    // increasing.
     static inline void write128bit_special(void *srcvp, void *valvp) {
       uint128_t __attribute__ ((aligned (16))) with_val = * (uint128_t *) valvp;
       uint128_t __attribute__ ((aligned (16))) cmp_val = * (uint128_t *) srcvp;
       uint128_t *src = srcvp;
       uint128_t *cmp = &cmp_val;
       uint128_t *with = &with_val;
-      char successful = 0;
-      with->hi = cmp->hi + 1;
 
-      while (!successful) {
-        __asm__ __volatile__ ("lock; cmpxchg16b (%6);"
-            "setz %7; "
-            : "=a" (cmp->lo),
-            "=d" (cmp->hi)
-            : "0" (cmp->lo),
-            "1" (cmp->hi),
-            "b" (with->lo),
-            "c" (with->hi),
-            "r" (src),
-            "m" (successful)
-            : "cc", "memory");
-        if (!successful) {
-          with->hi = cmp->hi + 1;
-        }
+      with->hi = cmp->hi + 1;
+      while (!_cas128bit(src, cmp, with)) {
+        with->hi = cmp->hi + 1;
       }
     }
 
+    // srcvp: Address of a 16-byte aligned address or else General Protection Fault (GPF)
+    // valvp: New value to replace the old
+    // retvalp: Stores the old value
     static inline void exchange128bit(void *srcvp, void *valvp, void *retvalvp) {
       uint128_t __attribute__ ((aligned (16))) with_val = * (uint128_t *) valvp;
       uint128_t __attribute__ ((aligned (16))) cmp_val = * (uint128_t *) srcvp;
       uint128_t *src = srcvp;
       uint128_t *cmp = &cmp_val;
       uint128_t *with = &with_val;
-      char successful = 0;
-
-      while (!successful) {
-        __asm__ __volatile__ ("lock; cmpxchg16b (%6);"
-            "setz %7; "
-            : "=a" (cmp->lo),
-            "=d" (cmp->hi)
-            : "0" (cmp->lo),
-            "1" (cmp->hi),
-            "b" (with->lo),
-            "c" (with->hi),
-            "r" (src),
-            "m" (successful)
-            : "cc", "memory");
-      }
-
+      while (!_cas128bit(src, cmp, with)) ;
       *(uint128_t *) retvalvp = cmp_val; 
     }
 
+    // Special-case which will update the ABA count of valvp to be
+    // one plus the srcvp. This is needed as ABA count needs to be monotonically
+    // increasing.
     static inline void exchange128bit_special(void *srcvp, void *valvp, void *retvalvp) {
       uint128_t __attribute__ ((aligned (16))) with_val = * (uint128_t *) valvp;
       uint128_t __attribute__ ((aligned (16))) cmp_val = * (uint128_t *) srcvp;
       uint128_t *src = srcvp;
       uint128_t *cmp = &cmp_val;
       uint128_t *with = &with_val;
-      char successful = 0;
+      
       with->hi = cmp->hi + 1;
-
-      while (!successful) {
-        __asm__ __volatile__ ("lock; cmpxchg16b (%6);"
-            "setz %7; "
-            : "=a" (cmp->lo),
-            "=d" (cmp->hi)
-            : "0" (cmp->lo),
-            "1" (cmp->hi),
-            "b" (with->lo),
-            "c" (with->hi),
-            "r" (src),
-            "m" (successful)
-            : "cc", "memory");
-        if (!successful) {
-          with->hi = cmp->hi + 1;
-        }
+      while (!_cas128bit(src, cmp, with)) {
+        with->hi = cmp->hi + 1;
       }
-
       *(uint128_t *) retvalvp = cmp_val; 
     }
     
@@ -250,20 +223,7 @@ module AtomicObjects {
       uint128_t *src = srcvp;
       uint128_t *cmp = &cmp_val;
       uint128_t *with = &with_val;
-      char result;
-
-      __asm__ __volatile__ ("lock; cmpxchg16b (%6);"
-          "setz %7; "
-          : "=a" (cmp->lo),
-          "=d" (cmp->hi)
-          : "0" (cmp->lo),
-          "1" (cmp->hi),
-          "b" (with->lo),
-          "c" (with->hi),
-          "r" (src),
-          "m" (result)
-          : "cc", "memory");
-
+      _cas128bit(src, cmp, with);
       *(uint128_t *)dstvp = cmp_val;
     }
   }
@@ -279,15 +239,6 @@ module AtomicObjects {
 
   pragma "no doc"
   extern proc chpl_return_wide_ptr_node(c_nodeid_t, c_void_ptr) : wide_ptr_t;
-
-  /*
-     Constants used for managing compression and decompression for atomic objects. 
-     It should be noted that if numLocales >= 2^16, then any
-     object being operated on is added to the descriptor table, which will leak data
-     if never freed with '_delete' (although if the memory is reused,
-     so will the memory managed by this object). The descriptor table will be cleaned
-     up automatically when this goes out of scope.
-  */
 
   if numLocales >= 2**16 {
     writeln("[WARNING]: AtomicObjects currently only supports up to 65535 locales!");
@@ -306,7 +257,7 @@ module AtomicObjects {
 
   pragma "no doc"
   inline proc castToObj(type objType, addr) {
-    return __primitive("cast", objType, uintToCVoidPtr(addr));
+    return __primitive("cast", objType?, uintToCVoidPtr(addr));
   }
 
   pragma "no doc"
@@ -340,21 +291,23 @@ module AtomicObjects {
   /*
      Compresses an object into a descriptor.
   */
-  proc compress(obj) : uint {
+  proc compress(obj : ?objType) : uint {
     if obj == nil then return 0;
 
-    // Perform a faster compression by packing the 48 usable bits of the virtual
+    // Perform compression by packing the 48 usable bits of the virtual
     // address with 16 bits of the locale/node id.
     var locId : uint(64) = obj.locale.id : uint(64);
     var addr = getAddr(obj);
-    return (locId << compressedLocIdOffset) | (addr & compressedAddrMask);
+    var ret = (locId << compressedLocIdOffset) | (addr & compressedAddrMask);
+    if boundsChecking then assert(decompress(objType, ret) == obj);
+    return ret;
   }
 
   pragma "no doc"
   /*
      Decompresses a descriptor into the wide pointer object.
   */
-  proc decompress(type objType, descr:uint) : objType {
+  proc decompress(type objType, descr:uint) : objType? {
     if descr == 0 then return nil;
 
     // If we have less than 2^16 locales, then we know we performed the
@@ -369,7 +322,8 @@ module AtomicObjects {
     // the stack and memcpy our wideptr into the other. This is needed so we
     // have the same type.
     var wideptr = chpl_return_wide_ptr_node(locId, uintToCVoidPtr(addr));
-    var newObj : objType;
+    var newObj : objType?;
+    // Ensure that newObj is a wide pointer
     on Locales[here.id] do newObj = nil;
     c_memcpy(c_ptrTo(newObj), c_ptrTo(wideptr), 16);
     return newObj;
@@ -413,7 +367,7 @@ module AtomicObjects {
       this.__ABA_cnt = other.__ABA_cnt;
     }
 
-    inline proc getObject() {
+    inline proc getObject() : __ABA_objType? {
       return decompress(__ABA_objType, __ABA_ptr);
     }
 
@@ -425,7 +379,7 @@ module AtomicObjects {
       f <~> "(ABA){cnt=" <~> this.__ABA_cnt <~> ", obj=" <~> this.getObject() <~> "}";
     }
 
-    forwarding this.getObject();
+    forwarding this.getObject()!;
   }
 
   pragma "no doc"
@@ -465,105 +419,17 @@ module AtomicObjects {
     return aba1.__ABA_cnt != aba2.__ABA_cnt || aba1.__ABA_ptr != aba2.__ABA_ptr;
   }
 
-  proc ==(const ref aba : ABA, other) {
-    return aba.getObject() == other;
-  }
-
-  proc !=(const ref aba : ABA, other) {
-    return aba.getObject() != other;
-  }
-
-  proc >(const ref aba : ABA, other) {
-    return aba.getObject() > other;
-  }
-
-  proc >=(const ref aba : ABA, other) {
-    return aba.getObject() >= other;
-  }
-
-  proc <(const ref aba : ABA, other) {
-    return aba.getObject() < other;
-  }
-
-  proc <=(const ref aba : ABA, other) {
-    return aba.getObject() <= other;
-  }
-
-  proc +(const ref aba : ABA, other) {
-    return aba.getObject() + other;
-  }
-
-  proc -(const ref aba : ABA, other) {
-    return aba.getObject() - other;
-  }
-
-  proc *(const ref aba : ABA, other) {
-    return aba.getObject() * other;
-  }
-
-  proc /(const ref aba : ABA, other) {
-    return aba.getObject() / other;
-  }
-
-  proc +=(const ref aba : ABA, other) {
-    aba.getObject() += other;
-  }
-
-  proc -=(const ref aba : ABA, other) {
-    aba.getObject() -= other;
-  }
-
-  proc *=(const ref aba : ABA, other) {
-    aba.getObject() *= other;
-  }
-
-  proc /=(const ref aba : ABA, other) {
-    aba.getObject() /= other;
-  }
-
-  proc ^(const ref aba : ABA, other) {
-    return aba.getObject() ^ other;
-  }
-
-  proc |(const ref aba : ABA, other) {
-    return aba.getObject() | other;
-  }
-
-  proc ^=(const ref aba : ABA, other) {
-    aba.getObject() ^= other;
-  }
-
-  proc |=(const ref aba : ABA, other) {
-    aba.getObject() |= other;
-  }
-
-  proc <<(const ref aba : ABA, other) {
-    return aba.getObject() << other;
-  }
-
-  proc >>(const ref aba : ABA, other) {
-    return aba.getObject() >> other;
-  }
-
-  proc <<=(const ref aba : ABA, other) {
-    aba.getObject() <<= other;
-  }
-
-  proc >>=(const ref aba : ABA, other) {
-    aba.getObject() >>= other;
-  }
-
   record AtomicObject {
     type objType;
     // If this atomic instance provides ABA support
     param hasABASupport : bool;
     // If this atomic instance provides global atomics
     param hasGlobalSupport : bool;
-    var atomicVar : if hasABASupport then _ddata(_ABAInternal(objType)) else atomic uint(64);
+    var atomicVar : if hasABASupport then _ddata(_ABAInternal(objType?)) else atomic uint(64);
 
     proc init(type objType, param hasABASupport = false, param hasGlobalSupport = !_local) {
       if !isUnmanagedClass(objType) { 
-        compilerError("LocalAtomicObject must take a 'unmanaged' type, not ", objType : string);
+        compilerError ("LocalAtomicObject must take a 'unmanaged' type, not ", objType : string);
       }
       this.objType = objType;
       this.hasABASupport = hasABASupport;
@@ -571,9 +437,10 @@ module AtomicObjects {
       this.complete();
       if hasABASupport {
         var ptr : c_void_ptr;
-        posix_memalign(c_ptrTo(ptr), 16, c_sizeof(ABA(objType)));
-        this.atomicVar = ptr:_ddata(_ABAInternal(objType));
-        c_memset(ptr, 0, c_sizeof(ABA(objType)));
+        var retval = posix_memalign(c_ptrTo(ptr), 16, c_sizeof(ABA(objType?)));
+        if retval then halt();
+        this.atomicVar = ptr:_ddata(_ABAInternal(objType?));
+        c_memset(ptr, 0, c_sizeof(ABA(objType?)));
       }
     }
 
@@ -604,7 +471,7 @@ module AtomicObjects {
 
     // Object(objType) -> Pointer(uint(64))
     pragma "no doc"
-    inline proc toPointer(obj:objType) : uint(64) {
+    inline proc toPointer(obj:objType?) : uint(64) {
       if hasGlobalSupport {
         return compress(obj);
       } else {
@@ -620,7 +487,7 @@ module AtomicObjects {
 
     // Pointer(uint(64)) -> Object(objType)
     pragma "no doc"
-    inline proc fromPointer(ptr : uint(64)) : objType {
+    inline proc fromPointer(ptr : uint(64)) : objType? {
       if hasGlobalSupport {
         return decompress(objType, ptr);
       } else {
@@ -639,60 +506,60 @@ module AtomicObjects {
     pragma "no doc"
     inline proc doABACheck() param {
       if !hasABASupport {
-        compilerWarning("Attempt to use ABA API from AtomicObject(hasABASupport=", hasABASupport, ", hasGlobalSupport=", hasGlobalSupport, ")");
+        compilerError("Attempt to use ABA API from AtomicObject(hasABASupport=", hasABASupport, ", hasGlobalSupport=", hasGlobalSupport, ")");
       }
     }
 
-    proc readABA() : ABA(objType) {
+    proc readABA() : ABA(objType?) {
       doABACheck();
-      var ret : ABA(objType);
+      var ret : ABA(objType?);
       on this {
-        var dest : ABA(objType);
+        var dest : ABA(objType?);
         read128bit(atomicVar:c_void_ptr, c_ptrTo(dest));
         ret = dest;
       }
       return ret;
     }
 
-    proc read() : objType {
+    proc read() : objType? {
       return fromPointer(atomicVariable.read());
     }
 
-    proc compareExchange(expectedObj : objType, newObj : objType) : bool {
+    proc compareExchange(expectedObj : objType?, newObj : objType?) : bool {
       return atomicVariable.compareExchange(toPointer(expectedObj), toPointer(newObj));
     }
 
-    proc compareExchangeABA(expectedObj : ABA(objType), newObj : objType) : bool {
+    proc compareExchangeABA(expectedObj : ABA(objType?), newObj : objType?) : bool {
       doABACheck();
       var ret : bool;
       on this {
         var cmp = expectedObj;
         // Note that no 'cas128bit_special' is needed here as the 'cas128bit' will detect
         // a change from the expectedObj passed, which of course includes the _ABA_cnt.
-        var val = new ABA(objType, toPointer(newObj), atomicVar[0]._ABA_cnt.read() + 1);
+        var val = new ABA(objType?, toPointer(newObj), atomicVar[0]._ABA_cnt.read() + 1);
         ret = cas128bit(atomicVar:c_void_ptr, c_ptrTo(cmp), c_ptrTo(val)) : bool;
       }
       return ret;
     }
 
-    proc compareExchangeABA(expectedObj : ABA(objType), newObj : ABA(objType)) : bool {
+    proc compareExchangeABA(expectedObj : ABA(objType?), newObj : ABA(objType?)) : bool {
       compareExchangeABA(expectedObj, newObj.getObject());
     }
 
-    proc write(newObj:objType) {
+    proc write(newObj:objType?) {
       atomicVariable.write(toPointer(newObj));
     }
 
-    proc write(newObj:ABA(objType)) {
+    proc write(newObj:ABA(objType?)) {
       write(newObj.getObject());
     }
 
-    proc writeABA(newObj: ABA(objType)) {
+    proc writeABA(newObj: ABA(objType?)) {
       doABACheck();
       write128bit(atomicVar:c_void_ptr, c_ptrTo(newObj));
     }
 
-    proc writeABA(newObj: objType) {
+    proc writeABA(newObj: objType?) {
       doABACheck();
       // Note: We do not invoke `write128bit` here as we _must_ ensure that _ABA_cnt
       // is one plus the previous, otherwise we inject a race condition where a task
@@ -701,20 +568,20 @@ module AtomicObjects {
       // _ABA_cnt to be written back, which by itself opens the possibility for other
       // ABA race conditions that we're trying to solve. 'write128bit_special' solves this
       // by setting the 'with' upper 64-bits equal to one plus the actual 'cmp' upper 64-bits.
-      write128bit_special(new ABA(objType, toPointer(objType), 0));
+      write128bit_special(new ABA(objType?, toPointer(newObj), 0));
     }
 
-    inline proc exchange(newObj:objType) {
+    inline proc exchange(newObj:objType?) : objType? {
       return fromPointer(atomicVariable.exchange(toPointer(newObj)));
     }
 
-    inline proc exchangeABA(newObj : objType) : ABA(objType) {
+    inline proc exchangeABA(newObj : objType?) : ABA(objType?) {
       doABACheck();
-      var ret : ABA(objType);
+      var ret : ABA(objType?);
       on this {
-        var retval : ABA(objType);
+        var retval : ABA(objType?);
         var _newObj = newObj;
-        var val = new ABA(objType, toPointer(newObj), 0);
+        var val = new ABA(objType?, toPointer(newObj), 0);
         exchange128bit_special(atomicVar:c_void_ptr, c_ptrTo(_newObj), c_ptrTo(retval));
         ret = retval;
       }
@@ -722,11 +589,11 @@ module AtomicObjects {
       return ret; 
     }
 
-    inline proc exchangeABA(newObj: ABA(objType)) : ABA(objType) {
+    inline proc exchangeABA(newObj: ABA(objType?)) : ABA(objType?) {
       doABACheck();
-      var ret : ABA(objType);
+      var ret : ABA(objType?);
       on this {
-        var retval : ABA(objType);
+        var retval : ABA(objType?);
         var _newObj = newObj;
         var val = newObj;
         exchange128bit(atomicVar:c_void_ptr, c_ptrTo(_newObj), c_ptrTo(retval));
